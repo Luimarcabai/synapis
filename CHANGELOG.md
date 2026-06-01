@@ -1,5 +1,19 @@
 # Changelog
 
+## v4.5.1 (2026-06-01)
+
+### Fixed
+
+- **`/eod` reported 0 projects for non-git folders** (`core/_eod-gather.sh`): `observe_v3.py` writes observations for a non-git `cwd` to the root `homunculus/observations.jsonl` with `project_id: "global"` (the `project_name` is still correct), but the gather only walked `homunculus/projects/<hash>/` and never read the root file. The writer and reader disagreed on where non-git projects live, so a full day of activity in any non-git folder surfaced as **0** in `/eod`. The gather now also reads the root file, grouping its observations by `project_name`. Reported by @NestorPVsf.
+- **Cross-OS gather robustness** (`core/_eod-gather.sh`): for users syncing `observations.jsonl` between macOS and Windows (e.g. via Nextcloud), the file mixes `C:\…` and `/Users/…` paths. Node's `path.basename` is platform-specific (the POSIX build ignores `\`), so "files touched" came out mangled on the foreign OS, and the gather could try to `git` against the other machine's path. Added a `baseName()` that splits on both `/` and `\`; roots that don't exist on the current machine are skipped before any `git` call; `HOME || USERPROFILE` is resolved; and projects are merged by `project_name` so the same project from two machines collapses into one entry. Reported by @NestorPVsf.
+
+### Tests
+
+- New suite `tests/test-eod-gather.sh` — 8 hermetic tests (via `SINAPSIS_HOMUNCULUS` / `SINAPSIS_SKILLS` overrides) covering root-file detection, name grouping, cross-OS basename, subdir+root merge, today-only filtering, empty-dir graceful exit, the canonical `_projects.json` loader, and output shape.
+- Existing suites re-run clean: `test-security` 11/11, `test-gstack-separation` 18/18.
+
+---
+
 ## v4.5.0 (2026-04-21)
 
 ### Added — Opus 4.7 integration

@@ -3,7 +3,7 @@
 [![Version](https://img.shields.io/badge/version-4.5.0-blue.svg)](https://github.com/Luispitik/sinapsis)
 [![Tests](https://img.shields.io/badge/tests-112%20passing-green.svg)](tests/)
 [![CI](https://github.com/Luispitik/sinapsis/actions/workflows/tests.yml/badge.svg)](https://github.com/Luispitik/sinapsis/actions)
-[![License](https://img.shields.io/badge/license-Source%20Available-orange.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 ### The skill system for Claude Code that learns and adapts to you.
 
@@ -424,13 +424,7 @@ Visit **[salgadoia.com](https://salgadoia.com)** for mentoring, courses, and con
 
 ## License
 
-Sinapsis is **source-available** under a custom license:
-
-- **Free** for personal and internal business use
-- **Free** to study, modify, and learn from
-- **Commercial exploitation** exclusively reserved to Luis Salgado / SalgadoIA
-
-See [LICENSE](LICENSE) for full terms.
+Sinapsis is released under the **MIT License** — free for personal, commercial, and any other use, including modification, distribution, and sale. The only condition is that the copyright notice in [LICENSE](LICENSE) is preserved.
 
 ---
 
