@@ -1,5 +1,21 @@
 # Changelog
 
+## v4.6.0 (2026-06-01)
+
+### Changed — Opus 4.8 alignment
+
+- **Caps re-tuned for Claude Opus 4.8** (`_instinct-activator.sh`, `_session-learner.sh`): `MAX_INSTINCTS_INJECTED` 6 → 8, `TOKEN_BUDGET` 4000 → 6000, learner observation window 5000 → 8000 lines. Opus 4.8 keeps long context on-task with fewer compactions and better compaction recovery, so a richer per-turn instinct injection and a longer cross-session window for the learner carry no quality regression. The 1M context window is unchanged from Opus 4.7.
+- **Prompt-cache fit improved, no code change.** Opus 4.8 lowers the minimum cacheable prompt to 1,024 tokens and adds mid-conversation `role: "system"` messages — the exact shape of Sinapsis's per-turn `systemMessage` injection — so the byte-stable instinct block introduced in v4.5 caches more readily (~90% read discount once warm).
+- **Hot path remains model-free.** The activator and learner are still pure bash/node. Opus 4.8's `effort` parameter defaults to `high` in Claude Code; Sinapsis needs no change because it never calls the model directly.
+- **RFC `docs/rfc-v5-adaptive-thinking.md` retargeted to `claude-opus-4-8`**: the opt-in `/analyze-session` SDK path now uses adaptive thinking with the `effort` parameter (`budget_tokens` is rejected on Opus 4.7+). Multi-agent blueprint Architect tier moved Opus 4.7 → 4.8.
+
+### Tests
+
+- New `tests/test-v46-opus48.sh`: asserts the re-tuned caps (`TOKEN_BUDGET` >= 6000, `MAX_INSTINCTS_INJECTED` = 8, learner window >= 8000) and that no stale `claude-opus-4-7` model ID remains in `docs/` or `core/`.
+- Existing suites re-run clean, including `test-v45-opus47` (cap assertions use `>=`, so they still pass).
+
+---
+
 ## v4.5.1 (2026-06-01)
 
 ### Fixed

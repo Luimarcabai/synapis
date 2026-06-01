@@ -141,9 +141,11 @@ process.stdin.on("end", () => {
     const d = m.domain || "_default";
     if (!domainMap[d]) domainMap[d] = m; // already sorted, first = highest priority
   }
-  // v4.5: top-N raised from 3 to 6 — with Opus 4.7 prompt caching the cost of extra
+  // v4.5: top-N raised from 3 to 6 — with Opus 4.7+ prompt caching the cost of extra
   // instincts is amortised across tool uses, so we can be more generous per turn.
-  const MAX_INSTINCTS_INJECTED = 6;
+  // v4.6 (Opus 4.8): 6 → 8. The lower 1,024-token cache minimum in 4.8 plus its stronger
+  // long-context handling let the larger byte-stable block cache reliably, no regression.
+  const MAX_INSTINCTS_INJECTED = 8;
   const top = Object.values(domainMap).slice(0, MAX_INSTINCTS_INJECTED);
 
   // v4.3.1: sanitize inject content (#5F — prompt injection prevention)
@@ -153,7 +155,8 @@ process.stdin.on("end", () => {
   const PATH_TRAVERSAL = /\.\.[\/\\]|~\/|\/etc\/|\/proc\/|%2e%2e/i;
   // v4.3.3: token budget cap — max chars injected per tool use (inspired by Cortex 8000/session)
   // v4.5: raised 1500 → 4000 to match 6-instinct cap; still well below any sane context ceiling.
-  const TOKEN_BUDGET = 4000;
+  // v4.6 (Opus 4.8): 4000 → 6000 to match the 8-instinct cap.
+  const TOKEN_BUDGET = 6000;
 
   // Only output systemMessage if there are injectable matches
   if (top.length > 0) {
