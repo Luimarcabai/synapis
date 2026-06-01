@@ -13,15 +13,16 @@ Sinapsis v4.5 learner is fully deterministic: bash + node regex detectors over
 `observations.jsonl`. This is great for the hot path (Stop hook, PreToolUse inject),
 but the deep semantic pass — `/analyze-session` — is still only regex-backed.
 
-Claude Opus 4.7 ships with **adaptive thinking** (replacing the old
-`budget_tokens` extended-thinking knob) and native interleaved thinking between
-tool calls. For offline, on-demand analysis of a session this is a better tool
-than hand-written regex: clustering, contradictions across days, natural-language
+Claude Opus 4.8 ships with **adaptive thinking** as the only thinking mode (the
+old `budget_tokens` extended-thinking knob returns a 400) plus an `effort`
+parameter that defaults to `high`, and native interleaved thinking between tool
+calls. For offline, on-demand analysis of a session this is a better tool than
+hand-written regex: clustering, contradictions across days, natural-language
 gotchas that regex can't see.
 
 ## Goals
 
-1. `/analyze-session` can optionally call Claude Opus 4.7 with adaptive thinking
+1. `/analyze-session` can optionally call Claude Opus 4.8 with adaptive thinking
    to produce higher-quality instinct proposals.
 2. **Zero regression** when the SDK path is disabled: the existing regex pipeline
    remains the default and runs identically.
@@ -48,10 +49,12 @@ calls.
 
 ```python
 response = client.messages.create(
-    model="claude-opus-4-7",
+    model="claude-opus-4-8",
     max_tokens=4096,
-    # Adaptive thinking replaces extended_thinking.budget_tokens (Opus 4.7)
+    # Adaptive thinking is the only thinking mode on Opus 4.7+ (budget_tokens -> 400).
+    # Depth is governed by effort, which defaults to "high" on Opus 4.8.
     thinking={"type": "adaptive", "display": "summarized"},
+    output_config={"effort": "high"},
     # Cache the fixed system block — docs for the instinct schema rarely change
     system=[
         {
@@ -74,7 +77,9 @@ response = client.messages.create(
 ```
 
 **Cache expectation:** the system block is byte-stable across every session.
-Second call within 5 min TTL = ~90 % input-token discount.
+Second call within the 5 min ephemeral TTL = ~90 % input-token discount. Note:
+Opus 4.8's minimum cacheable prompt is 1,024 tokens, so keep this cached block
+above that floor (pad with the full instinct schema) or it will not cache.
 
 ### 3. Output contract
 
@@ -126,7 +131,7 @@ branch and silently degrade without it. Mitigation:
 - Phase 2: if cache-hit ratio > 60 % and proposal acceptance rate > 40 %, make
   it default-on (still overridable).
 - Phase 3 (speculative, multi-agent v5): Managed Agents on Anthropic Cloud
-  fan out Scout(Sonnet 4.6) → Analyst(Sonnet 4.6) → Architect(Opus 4.7). Not
+  fan out Scout(Sonnet 4.6) → Analyst(Sonnet 4.6) → Architect(Opus 4.8). Not
   covered here.
 
 ## Out of scope
