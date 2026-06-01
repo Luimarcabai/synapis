@@ -1,18 +1,35 @@
 #!/bin/bash
 # EOD Gather — Multi-project activity collector
-# Sinapsis v4.2.2
-# Scans homunculus/projects/ for today's observations across ALL projects.
+# Sinapsis v4.2.3
+# Scans homunculus/projects/ AND the root homunculus/observations.jsonl
+# (where non-git projects land) for today's observations across ALL projects.
+# Cross-OS safe: handles a Mac+Windows shared observations file (mixed \ and /
+# paths, foreign roots absent locally). Groups by project_name so the same
+# project merges across machines even when the cwd differs.
 # Outputs JSON with project names, observation counts, tools used, and git data.
-# Called by /eod command — replaces single-project git scan.
-# NO LLM. Pure deterministic Node.js.
+# Called by /eod command. NO LLM. Pure deterministic Node.js.
+#
+# v4.2.3 bug fixes (reported by Nestor PV, 2026-06-01):
+#   - Bug 1: non-git projects (project_id "global") are written to the ROOT
+#            observations.jsonl, but the gather only walked projects/<hash>/, so
+#            /eod reported 0 despite real activity. Now reads the root too.
+#   - Bug 2: cross-OS robustness — baseName() splits on both / and \ (Node's
+#            path.basename is platform-specific); foreign roots are skipped;
+#            HOME || USERPROFILE resolved; projects merged by name across OS.
+#
+# Test overrides (defaults unchanged): SINAPSIS_HOMUNCULUS points the data dir
+# elsewhere, SINAPSIS_SKILLS the registry dir. Used by tests/test-eod-gather.sh.
 
-HOMUNCULUS="$HOME/.claude/homunculus"
+HOMUNCULUS="${SINAPSIS_HOMUNCULUS:-$HOME/.claude/homunculus}"
 
 if [ "${SINAPSIS_DEBUG:-}" = "1" ]; then
   exec 2>>"$HOME/.claude/skills/_sinapsis-debug.log"
 fi
 
-[ ! -d "$HOMUNCULUS/projects" ] && echo '{"date":"'$(date -u +%Y-%m-%d)'","project_count":0,"projects":[]}' && exit 0
+if [ ! -d "$HOMUNCULUS/projects" ] && [ ! -f "$HOMUNCULUS/observations.jsonl" ]; then
+  echo '{"date":"'$(date -u +%Y-%m-%d)'","project_count":0,"total_observations":0,"projects":[]}'
+  exit 0
+fi
 
 node -e '
 const fs = require("fs");
@@ -20,16 +37,27 @@ const path = require("path");
 const { execFileSync } = require("child_process");
 
 const HOME = process.env.HOME || process.env.USERPROFILE || "";
-const homunculus = HOME + "/.claude/homunculus";
+const homunculus = process.env.SINAPSIS_HOMUNCULUS || path.join(HOME, ".claude", "homunculus");
+const skillsDir = process.env.SINAPSIS_SKILLS || path.join(HOME, ".claude", "skills");
 const projectsDir = path.join(homunculus, "projects");
+const rootObsFile = path.join(homunculus, "observations.jsonl");
 const today = new Date().toISOString().slice(0, 10);
 
+// Cross-OS basename: split on BOTH / and \ regardless of host platform.
+// Node path.basename is platform-specific (posix ignores \), which corrupts
+// Windows paths read on Mac/Linux and vice-versa when the file is shared.
+function baseName(p) {
+  if (!p) return null;
+  const parts = String(p).split(/[\\/]/).filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : null;
+}
+
 // Load project registry for names and roots.
-// Primary source: canonical _projects.json (array schema, populated by _session-learner.sh).
+// Primary: canonical _projects.json (array schema, populated by _session-learner.sh).
 // Fallback: legacy homunculus/projects.json (map schema, kept for back-compat).
 let registry = {};
 try {
-  const canonical = JSON.parse(fs.readFileSync(HOME + "/.claude/skills/_projects.json", "utf8"));
+  const canonical = JSON.parse(fs.readFileSync(path.join(skillsDir, "_projects.json"), "utf8"));
   if (canonical && Array.isArray(canonical.projects)) {
     for (const p of canonical.projects) {
       if (p && p.id) registry[p.id] = { name: p.name, root: p.root };
@@ -43,131 +71,154 @@ try {
   }
 } catch(e) {}
 
-const projects = [];
+// name -> root index (first wins). Recovers a LOCAL root for a project even when
+// its observations were written on another machine with a different cwd.
+const rootByName = {};
+for (const k of Object.keys(registry)) {
+  const info = registry[k] || {};
+  if (info.name && info.root && !rootByName[info.name]) rootByName[info.name] = info.root;
+}
 
-let entries;
-try { entries = fs.readdirSync(projectsDir); } catch(e) { entries = []; }
+// First candidate that exists on THIS machine, else "".
+function resolveRoot(candidates) {
+  for (const c of candidates) { if (c && fs.existsSync(c)) return c; }
+  return "";
+}
 
-for (const hash of entries) {
-  const obsFile = path.join(projectsDir, hash, "observations.jsonl");
-  if (!fs.existsSync(obsFile)) continue;
-
+function parseToday(obsFile) {
   let lines;
-  try {
-    lines = fs.readFileSync(obsFile, "utf8").trim().split("\n");
-  } catch(e) { continue; }
-
-  // Filter to today only
-  const todayLines = [];
+  try { lines = fs.readFileSync(obsFile, "utf8").trim().split("\n"); }
+  catch(e) { return []; }
+  const out = [];
   for (const line of lines) {
     try {
       const obj = JSON.parse(line);
-      if (obj.timestamp && obj.timestamp.startsWith(today)) {
-        todayLines.push(obj);
-      }
+      if (obj.timestamp && obj.timestamp.startsWith(today)) out.push(obj);
     } catch(e) {}
   }
+  return out;
+}
 
-  if (todayLines.length === 0) continue;
+// Git data for a root, only when it exists locally (foreign roots → null).
+function gitFor(projectRoot) {
+  if (!projectRoot || !fs.existsSync(projectRoot)) return null;
+  try {
+    const branch = execFileSync("git", ["-C", projectRoot, "branch", "--show-current"],
+      { stdio: ["pipe","pipe","pipe"], timeout: 3000 }).toString().trim();
+    let commits = "";
+    try {
+      const author = execFileSync("git", ["-C", projectRoot, "config", "user.email"],
+        { stdio: ["pipe","pipe","pipe"], timeout: 2000 }).toString().trim();
+      if (author) {
+        commits = execFileSync("git", ["-C", projectRoot, "log", "--oneline", "--since=00:00", "--author=" + author],
+          { stdio: ["pipe","pipe","pipe"], timeout: 5000 }).toString().trim();
+      }
+    } catch(e) {
+      try {
+        commits = execFileSync("git", ["-C", projectRoot, "log", "--oneline", "--since=00:00"],
+          { stdio: ["pipe","pipe","pipe"], timeout: 5000 }).toString().trim();
+      } catch(e2) {}
+    }
+    let status = "";
+    try {
+      status = execFileSync("git", ["-C", projectRoot, "status", "-s"],
+        { stdio: ["pipe","pipe","pipe"], timeout: 3000 }).toString().trim();
+    } catch(e) {}
+    return {
+      branch: branch,
+      commits_today: commits ? commits.split("\n").length : 0,
+      commits_log: commits || "(no commits today)",
+      uncommitted_files: status ? status.split("\n").length : 0,
+      status: status || "(clean)"
+    };
+  } catch(e) {
+    return null; // not a git repo or git error
+  }
+}
 
-  const info = registry[hash] || {};
-  const projectName = info.name || hash;
-  const projectRoot = info.root || "";
-
-  // Extract tools used today (unique)
+// Aggregate today-observations into a project record.
+function summarize(todayLines, name, root, hash, contextMd) {
   const tools = [...new Set(todayLines.filter(l => l.tool).map(l => l.tool))];
-
-  // Count errors
   const errorCount = todayLines.filter(l => l.is_error).length;
-
-  // Files touched (from Edit/Write inputs)
   const filesTouched = [...new Set(
     todayLines
       .filter(l => l.event === "tool_complete" && (l.tool === "Edit" || l.tool === "Write"))
       .map(l => {
         try {
-          const inp = JSON.parse(l.input || "{}");
-          return inp.file_path ? path.basename(inp.file_path) : null;
+          const inp = typeof l.input === "string" ? JSON.parse(l.input || "{}") : (l.input || {});
+          return baseName(inp.file_path);
         } catch(e) { return null; }
       })
       .filter(Boolean)
   )].slice(0, 15);
-
-  // Git data (if root exists)
-  let gitData = null;
-  if (projectRoot && fs.existsSync(projectRoot)) {
-    try {
-      const branch = execFileSync("git", ["-C", projectRoot, "branch", "--show-current"],
-        { stdio: ["pipe", "pipe", "pipe"], timeout: 3000 }
-      ).toString().trim();
-
-      let commits = "";
-      try {
-        const author = execFileSync("git", ["-C", projectRoot, "config", "user.email"],
-          { stdio: ["pipe", "pipe", "pipe"], timeout: 2000 }
-        ).toString().trim();
-        if (author) {
-          commits = execFileSync("git", ["-C", projectRoot, "log", "--oneline", "--since=00:00", "--author=" + author],
-            { stdio: ["pipe", "pipe", "pipe"], timeout: 5000 }
-          ).toString().trim();
-        }
-      } catch(e) {
-        try {
-          commits = execFileSync("git", ["-C", projectRoot, "log", "--oneline", "--since=00:00"],
-            { stdio: ["pipe", "pipe", "pipe"], timeout: 5000 }
-          ).toString().trim();
-        } catch(e2) {}
-      }
-
-      let status = "";
-      try {
-        status = execFileSync("git", ["-C", projectRoot, "status", "-s"],
-          { stdio: ["pipe", "pipe", "pipe"], timeout: 3000 }
-        ).toString().trim();
-      } catch(e) {}
-
-      gitData = {
-        branch: branch,
-        commits_today: commits ? commits.split("\n").length : 0,
-        commits_log: commits || "(no commits today)",
-        uncommitted_files: status ? status.split("\n").length : 0,
-        status: status || "(clean)"
-      };
-    } catch(e) {
-      // Not a git repo or git error — skip git data
-    }
-  }
-
-  // Read context.md if available
-  let contextMd = null;
-  const ctxFile = path.join(projectsDir, hash, "context.md");
-  if (fs.existsSync(ctxFile)) {
-    try { contextMd = fs.readFileSync(ctxFile, "utf8").trim(); } catch(e) {}
-  }
-
-  projects.push({
-    hash,
-    name: projectName,
-    root: projectRoot,
+  return {
+    hash: hash || null,
+    name: name,
+    root: root || "",
     observations_today: todayLines.length,
     tools_used: tools,
     files_touched: filesTouched,
     errors_today: errorCount,
-    git: gitData,
-    context: contextMd
-  });
+    git: gitFor(root),
+    context: contextMd || null
+  };
 }
 
-// Sort by observation count descending (most active first)
-projects.sort((a, b) => b.observations_today - a.observations_today);
+// Collect keyed by NAME so the same project from different machines / cwd /
+// storage location merges into one entry (cross-OS stable).
+const byName = {};
+function add(rec) {
+  if (!byName[rec.name]) { byName[rec.name] = rec; return; }
+  const e = byName[rec.name];
+  e.observations_today += rec.observations_today;
+  e.errors_today += rec.errors_today;
+  e.tools_used = [...new Set([...e.tools_used, ...rec.tools_used])];
+  e.files_touched = [...new Set([...e.files_touched, ...rec.files_touched])].slice(0, 15);
+  if (!e.git && rec.git) e.git = rec.git;
+  if (!e.root && rec.root) e.root = rec.root;
+  if (!e.hash && rec.hash) e.hash = rec.hash;
+  if (!e.context && rec.context) e.context = rec.context;
+}
+
+// 1) Per-project subdirs (git-tracked projects).
+let entries = [];
+try { entries = fs.readdirSync(projectsDir); } catch(e) {}
+for (const hash of entries) {
+  const obsFile = path.join(projectsDir, hash, "observations.jsonl");
+  if (!fs.existsSync(obsFile)) continue;
+  const todayLines = parseToday(obsFile);
+  if (todayLines.length === 0) continue;
+  const info = registry[hash] || {};
+  const seen = todayLines.find(l => l.project_name && l.project_name !== "global");
+  const name = info.name || (seen ? seen.project_name : hash);
+  const root = resolveRoot([info.root, rootByName[name]]);
+  let contextMd = null;
+  const ctxFile = path.join(projectsDir, hash, "context.md");
+  if (fs.existsSync(ctxFile)) { try { contextMd = fs.readFileSync(ctxFile, "utf8").trim(); } catch(e) {} }
+  add(summarize(todayLines, name, root, hash, contextMd));
+}
+
+// 2) Root observations.jsonl — non-git projects land here with project_id
+//    "global". Group by project_name (stable across OS even if cwd differs).
+if (fs.existsSync(rootObsFile)) {
+  const groups = {};
+  for (const l of parseToday(rootObsFile)) {
+    const nm = l.project_name || "global";
+    (groups[nm] = groups[nm] || []).push(l);
+  }
+  for (const nm of Object.keys(groups)) {
+    add(summarize(groups[nm], nm, resolveRoot([rootByName[nm]]), null, null));
+  }
+}
+
+const projects = Object.values(byName).sort((a, b) => b.observations_today - a.observations_today);
 
 const result = {
   date: today,
   project_count: projects.length,
-  total_observations: projects.reduce((sum, p) => sum + p.observations_today, 0),
+  total_observations: projects.reduce((s, p) => s + p.observations_today, 0),
   projects
 };
-
 console.log(JSON.stringify(result, null, 2));
 ' 2>/dev/null
 
