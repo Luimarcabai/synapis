@@ -72,7 +72,7 @@ Search instincts across ALL registered projects without promoting them.
 
 ### Step 1: Read Project Registry
 
-Read `~/.claude/skills/_projects.json`. Extract all active projects with their `root` paths.
+Read `~/.claude/skills/_sinapsis-projects.json`. Extract all active projects with their `root` paths.
 
 ### Step 2: Search Each Project
 

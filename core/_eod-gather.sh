@@ -53,11 +53,11 @@ function baseName(p) {
 }
 
 // Load project registry for names and roots.
-// Primary: canonical _projects.json (array schema, populated by _session-learner.sh).
+// Primary: canonical _sinapsis-projects.json (array schema, populated by _session-learner.sh).
 // Fallback: legacy homunculus/projects.json (map schema, kept for back-compat).
 let registry = {};
 try {
-  const canonical = JSON.parse(fs.readFileSync(path.join(skillsDir, "_projects.json"), "utf8"));
+  const canonical = JSON.parse(fs.readFileSync(path.join(skillsDir, "_sinapsis-projects.json"), "utf8"));
   if (canonical && Array.isArray(canonical.projects)) {
     for (const p of canonical.projects) {
       if (p && p.id) registry[p.id] = { name: p.name, root: p.root };

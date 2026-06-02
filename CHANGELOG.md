@@ -1,5 +1,18 @@
 # Changelog
 
+## v4.6.1 (2026-06-02)
+
+### Fixed
+
+- **Registry filename collision with skill-router / external launchers** (`_session-learner.sh`, `_eod-gather.sh`, `_generate-dashboard.py`, commands, installers): Sinapsis used `~/.claude/skills/_projects.json` as its canonical project registry, but that filename is also used by the bundled `skill-router` skill (and other launchers) with a different schema. On a machine where a launcher owns `_projects.json`, the session-learner upsert (added in v4.3.3) would append Sinapsis hash-entries into the launcher's registry on every Stop event, mixing two schemas in one file. Sinapsis now owns a dedicated `~/.claude/skills/_sinapsis-projects.json`; `_projects.json` is left entirely to skill-router. The learner re-populates the new registry automatically on Stop events (no migration needed), and `_eod-gather.sh` reads it with the legacy `homunculus/projects.json` fallback unchanged.
+- Template `core/_projects.json` renamed to `core/_sinapsis-projects.json`; the installers seed/chmod/preserve the new name and no longer create or touch `_projects.json`.
+
+### Tests
+
+- New `tests/test-registry-isolation.sh`: asserts the learner and gather target `_sinapsis-projects.json` and that no `core/` file references the launcher's `_projects.json`. `tests/test-install-upgrade.sh` and `tests/test-eod-gather.sh` updated to the new filename.
+
+---
+
 ## v4.6.0 (2026-06-01)
 
 ### Changed — Opus 4.8 alignment

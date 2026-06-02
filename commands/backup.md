@@ -36,7 +36,7 @@ Copy these files to the target, preserving the relative structure:
     _instinct-proposals.json       ← pending proposals
     _instinct.log                  ← activation audit trail
     _passive.log                   ← passive rule audit trail
-    _projects.json                 ← project registry
+    _sinapsis-projects.json                 ← project registry
   commands/                        ← all installed slash commands (*.md)
   CLAUDE.md                        ← entry point
   settings.json                    ← hook configuration

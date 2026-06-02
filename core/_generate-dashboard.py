@@ -141,7 +141,7 @@ def collect_skills():
 
 
 def collect_projects():
-    proj = load_json(SKILLS / '_projects.json', {'projects': []})
+    proj = load_json(SKILLS / '_sinapsis-projects.json', {'projects': []})
     active = [p for p in proj.get('projects', []) if p.get('active')]
     total_obs = 0
     proj_obs = []

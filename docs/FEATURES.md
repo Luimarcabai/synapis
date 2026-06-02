@@ -120,7 +120,7 @@ Parallel systems (not part of the confidence pipeline):
 ### _eod-gather.sh — Multi-Project EOD (161 lines)
 - Scans ALL `homunculus/projects/` for today's observations
 - Extracts tools used, files touched, error count per project
-- Cross-references `_projects.json` for names/roots
+- Cross-references `_sinapsis-projects.json` for names/roots
 - Runs git log/status/branch per project root
 
 ---
@@ -276,7 +276,7 @@ Deterministic regex rules — not probabilistic. Always fire when trigger matche
 │   ├── _dream.sh                     # Dream cycle (manual/scheduled)
 │   ├── _eod-gather.sh                # EOD helper
 │   ├── _operator-state.json          # Identity + decisions (cross-project)
-│   ├── _projects.json                # Project registry
+│   ├── _sinapsis-projects.json                # Project registry
 │   ├── _catalog.json                 # Skill registry with token estimates
 │   ├── _instinct.log                 # Activation audit trail
 │   ├── _passive.log                  # Passive rule audit trail

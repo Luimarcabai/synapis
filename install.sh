@@ -122,7 +122,7 @@ for arg in "$@"; do
     [ "$arg" = "--force-update" ] && FORCE_UPDATE=true
 done
 
-for datafile in _passive-rules.json _projects.json _instincts-index.json; do
+for datafile in _passive-rules.json _sinapsis-projects.json _instincts-index.json; do
     if $FORCE_UPDATE || [ ! -f "$SKILLS_DIR/$datafile" ]; then
         cp "$SCRIPT_DIR/core/$datafile" "$SKILLS_DIR/$datafile"
         if $FORCE_UPDATE; then
@@ -151,7 +151,7 @@ else
 fi
 
 # Restrictive permissions on data files (#5D)
-chmod 600 "$SKILLS_DIR/_instincts-index.json" "$SKILLS_DIR/_passive-rules.json" "$SKILLS_DIR/_projects.json" "$SKILLS_DIR/_operator-state.json" 2>/dev/null || true
+chmod 600 "$SKILLS_DIR/_instincts-index.json" "$SKILLS_DIR/_passive-rules.json" "$SKILLS_DIR/_sinapsis-projects.json" "$SKILLS_DIR/_operator-state.json" 2>/dev/null || true
 
 echo -e "${GREEN}  OK${NC} Core config files installed"
 

@@ -69,11 +69,11 @@ fi
 echo ""
 echo "[Section 3] Version bumped to v4.6.0"
 
-# T7: README header + badge at v4.6.0
-if grep -q "# Sinapsis v4.6.0" "$ROOT/README.md" 2>/dev/null && grep -q "version-4.6.0" "$ROOT/README.md" 2>/dev/null; then
-  pass "T7: README declares v4.6.0 (header + badge)"
+# T7: README header + badge at v4.6.x (Opus 4.8 line; patches keep the 4.6 minor)
+if grep -qE "# Sinapsis v4\.6\.[0-9]" "$ROOT/README.md" 2>/dev/null && grep -qE "version-4\.6\.[0-9]" "$ROOT/README.md" 2>/dev/null; then
+  pass "T7: README declares v4.6.x (header + badge)"
 else
-  fail "T7: README should declare v4.6.0 in header and badge"
+  fail "T7: README should declare v4.6.x in header and badge"
 fi
 
 # T8: CHANGELOG has a v4.6.0 entry

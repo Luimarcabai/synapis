@@ -150,12 +150,12 @@ try {
   // context.md write failure is non-critical
 }
 
-// ── JOB 1.5: Upsert canonical project registry _projects.json ──
-// FIX: prior to this, _projects.json was never populated by any hook even though
+// ── JOB 1.5: Upsert canonical project registry _sinapsis-projects.json ──
+// FIX: prior to this, _sinapsis-projects.json was never populated by any hook even though
 // /projects, /eod, /instinct-status, /evolve, /backup all read from it.
 // We upsert here on every Stop event — atomic write + advisory lock, idempotent.
 try {
-  const registryPath = process.env.HOME + "/.claude/skills/_projects.json";
+  const registryPath = process.env.HOME + "/.claude/skills/_sinapsis-projects.json";
   const lockPath = registryPath + ".lock";
   const now = new Date().toISOString();
 
@@ -186,7 +186,7 @@ try {
   if (lockFd === null) {
     // Could not acquire lock — skip this upsert. Next Stop will retry.
     if (process.env.SINAPSIS_DEBUG === "1") {
-      process.stderr.write("[session-learner] _projects.json: lock contention, skipping upsert\n");
+      process.stderr.write("[session-learner] _sinapsis-projects.json: lock contention, skipping upsert\n");
     }
   } else {
     try {
@@ -223,7 +223,7 @@ try {
 } catch(e) {
   // Registry upsert failure is non-critical (logged for debugging)
   if (process.env.SINAPSIS_DEBUG === "1") {
-    process.stderr.write("[session-learner] _projects.json upsert failed: " + e.message + "\n");
+    process.stderr.write("[session-learner] _sinapsis-projects.json upsert failed: " + e.message + "\n");
   }
 }
 

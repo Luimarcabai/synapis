@@ -8,7 +8,7 @@
 - **Catalog**: `{{CLAUDE_HOME}}/skills/_catalog.json`
 - **Passive rules**: `{{CLAUDE_HOME}}/skills/_passive-rules.json`
 - **Operator state**: `{{CLAUDE_HOME}}/skills/_operator-state.json`
-- **Projects registry**: `{{CLAUDE_HOME}}/skills/_projects.json`
+- **Projects registry**: `{{CLAUDE_HOME}}/skills/_sinapsis-projects.json`
 - **Archived skills**: `{{CLAUDE_HOME}}/skills/_archived/`
 - **Commands (global)**: `{{CLAUDE_HOME}}/commands/`
 

@@ -24,7 +24,7 @@ echo "$now | precompact | invoking learner" >> "$LOG" 2>/dev/null
 
 # Fire-and-forget: run the learner but bound its time so we never block the harness.
 # If learner is already running (Stop fired in parallel), the advisory lock inside it
-# serialises writes to _projects.json.
+# serialises writes to _sinapsis-projects.json.
 timeout 8 bash "$LEARNER" </dev/null >/dev/null 2>&1 &
 
 exit 0

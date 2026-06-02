@@ -138,6 +138,6 @@ EVOLUTION COMPLETE
 
 After generating any new skill or command:
 1. Update `_catalog.json` with new entry
-2. Update `_projects.json` if project-specific
+2. Update `_sinapsis-projects.json` if project-specific
 3. Update `_operator-state.json` if it was a strategic decision
 4. Offer to install the new skill immediately
