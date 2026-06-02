@@ -81,7 +81,7 @@ The following areas are in scope for security reports:
 
 ### Upgrade Safety
 - Installer detects existing installation and creates timestamped backup
-- User data files (`_instincts-index.json`, `_passive-rules.json`, `_projects.json`, `_operator-state.json`) are preserved on upgrade — never overwritten
+- User data files (`_instincts-index.json`, `_passive-rules.json`, `_sinapsis-projects.json`, `_operator-state.json`) are preserved on upgrade — never overwritten
 - `--force-update` flag required to explicitly reset data files
 - `CLAUDE.md` is never overwritten if it exists
 - `settings.json` hooks are never overwritten (manual merge documented)

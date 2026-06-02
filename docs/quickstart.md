@@ -22,7 +22,7 @@ Despues de ejecutar `install.sh` o `install.bat`, tienes esto en tu ordenador:
     _catalog.json          ← Registro de todas las skills disponibles
     _passive-rules.json    ← Reglas que se aplican solas (seguridad, calidad)
     _operator-state.json   ← TU identidad, decisiones, memoria entre proyectos
-    _projects.json         ← Registro de tus proyectos
+    _sinapsis-projects.json         ← Registro de tus proyectos
   commands/                ← Comandos que puedes ejecutar (/evolve, /clone, etc.)
 ```
 

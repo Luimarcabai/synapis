@@ -113,7 +113,7 @@ copy /Y "%SCRIPT_DIR%core\_catalog.json" "%SKILLS_DIR%\_catalog.json" >nul
 
 :: User data files: preserve on upgrade, only create if missing
 :: Bug #9 fix: unconditional copy destroyed learned instincts, custom rules, and project registry
-for %%f in (_passive-rules.json _projects.json _instincts-index.json) do (
+for %%f in (_passive-rules.json _sinapsis-projects.json _instincts-index.json) do (
     if "!FORCE_UPDATE!"=="true" (
         copy /Y "%SCRIPT_DIR%core\%%f" "%SKILLS_DIR%\%%f" >nul
         echo   !  %%f force-updated (--force-update^)

@@ -13,7 +13,7 @@ Run with `/projects` or "list my projects".
 
 ## Process
 
-1. Read `~/.claude/skills/_projects.json`
+1. Read `~/.claude/skills/_sinapsis-projects.json`
 2. Read `~/.claude/skills/_instincts-index.json` for per-project instinct counts
 3. Read `~/.claude/homunculus/projects/{hash}/observations.jsonl` for per-project observation counts
 4. Display dashboard

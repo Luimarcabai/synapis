@@ -59,11 +59,11 @@ else
   fail "Fresh install should create _passive-rules.json"
 fi
 
-# ── TEST 3: Fresh install creates _projects.json ──
-if [ -f "$FAKE_SKILLS/_projects.json" ]; then
-  pass "Fresh install creates _projects.json"
+# ── TEST 3: Fresh install creates _sinapsis-projects.json ──
+if [ -f "$FAKE_SKILLS/_sinapsis-projects.json" ]; then
+  pass "Fresh install creates _sinapsis-projects.json"
 else
-  fail "Fresh install should create _projects.json"
+  fail "Fresh install should create _sinapsis-projects.json"
 fi
 
 # ── TEST 4: Upgrade preserves custom _instincts-index.json ──
@@ -163,8 +163,8 @@ else
   fail "Upgrade DESTROYED custom passive rules (Bug #2)"
 fi
 
-# ── TEST 6: Upgrade preserves custom _projects.json ──
-cat > "$FAKE_SKILLS/_projects.json" << 'CUSTOM_PROJECTS'
+# ── TEST 6: Upgrade preserves custom _sinapsis-projects.json ──
+cat > "$FAKE_SKILLS/_sinapsis-projects.json" << 'CUSTOM_PROJECTS'
 {
   "abc123def456": {
     "name": "my-saas-app",
@@ -181,13 +181,13 @@ CUSTOM_PROJECTS
 
 upgrade_with_user_data
 
-if grep -q "my-saas-app" "$FAKE_SKILLS/_projects.json" 2>/dev/null; then
+if grep -q "my-saas-app" "$FAKE_SKILLS/_sinapsis-projects.json" 2>/dev/null; then
   pass "Upgrade preserves project registry"
 else
   fail "Upgrade DESTROYED project registry (Bug #3)"
 fi
 
-if grep -q "client-portal" "$FAKE_SKILLS/_projects.json" 2>/dev/null; then
+if grep -q "client-portal" "$FAKE_SKILLS/_sinapsis-projects.json" 2>/dev/null; then
   pass "Upgrade preserves all registered projects"
 else
   fail "Upgrade DESTROYED registered projects"
@@ -269,7 +269,7 @@ for sh_file in "$SCRIPT_DIR/core/"*.sh; do
 done
 [ "$SYNTAX_BAD" -eq 0 ] && pass "All core/*.sh have valid bash syntax (regression: node -e quoting bug)"
 
-# ── TEST 13: _session-learner.sh upserts canonical _projects.json ──
+# ── TEST 13: _session-learner.sh upserts canonical _sinapsis-projects.json ──
 SANDBOX="$(mktemp -d)/upsert-test"
 mkdir -p "$SANDBOX/.claude/skills" "$SANDBOX/.claude/homunculus/projects/testhash000001"
 cat > "$SANDBOX/.claude/homunculus/projects/testhash000001/observations.jsonl" << 'EOF'
@@ -277,20 +277,20 @@ cat > "$SANDBOX/.claude/homunculus/projects/testhash000001/observations.jsonl" <
 {"timestamp":"2026-04-15T22:00:01Z","event":"tool_complete","tool":"Read","session":"s1","project_id":"testhash000001","project_name":"my-test-project","input":"{}"}
 {"timestamp":"2026-04-15T22:00:02Z","event":"tool_complete","tool":"Edit","session":"s1","project_id":"testhash000001","project_name":"my-test-project","input":"{}"}
 EOF
-cat > "$SANDBOX/.claude/skills/_projects.json" << 'EOF'
+cat > "$SANDBOX/.claude/skills/_sinapsis-projects.json" << 'EOF'
 {"version":"4.1","system":"sinapsis","projects":[]}
 EOF
 HOME="$SANDBOX" bash "$SCRIPT_DIR/core/_session-learner.sh" >/dev/null 2>&1 || true
 
-if grep -q '"name": "my-test-project"' "$SANDBOX/.claude/skills/_projects.json" 2>/dev/null; then
-  pass "_session-learner.sh upserts project entry into _projects.json"
+if grep -q '"name": "my-test-project"' "$SANDBOX/.claude/skills/_sinapsis-projects.json" 2>/dev/null; then
+  pass "_session-learner.sh upserts project entry into _sinapsis-projects.json"
 else
-  fail "_session-learner.sh did NOT upsert into _projects.json (bug regressed)"
+  fail "_session-learner.sh did NOT upsert into _sinapsis-projects.json (bug regressed)"
 fi
 
 # Idempotency: second run should NOT duplicate
 HOME="$SANDBOX" bash "$SCRIPT_DIR/core/_session-learner.sh" >/dev/null 2>&1 || true
-COUNT=$(grep -c '"id":' "$SANDBOX/.claude/skills/_projects.json" 2>/dev/null || echo 0)
+COUNT=$(grep -c '"id":' "$SANDBOX/.claude/skills/_sinapsis-projects.json" 2>/dev/null || echo 0)
 if [ "$COUNT" -eq 1 ]; then
   pass "_session-learner.sh upsert is idempotent (no duplicates on repeat)"
 else
@@ -311,7 +311,7 @@ git -C "$FAKEREPO" init -q
 git -C "$FAKEREPO" remote add origin "https://github.com/test/e2e-project.git"
 
 # Seed empty canonical registry so upsert has a target
-cat > "$SANDBOX/.claude/skills/_projects.json" << 'EOF'
+cat > "$SANDBOX/.claude/skills/_sinapsis-projects.json" << 'EOF'
 {"version":"4.1","system":"sinapsis","projects":[]}
 EOF
 
@@ -348,14 +348,14 @@ fi
 HOME="$SANDBOX" USERPROFILE="$SANDBOX" HOMEDRIVE="" HOMEPATH="" \
   bash "$SCRIPT_DIR/core/_session-learner.sh" >/dev/null 2>&1 || true
 
-if grep -q '"remote": "https://github.com/test/e2e-project.git"' "$SANDBOX/.claude/skills/_projects.json" 2>/dev/null; then
+if grep -q '"remote": "https://github.com/test/e2e-project.git"' "$SANDBOX/.claude/skills/_sinapsis-projects.json" 2>/dev/null; then
   pass "_session-learner.sh derives remote via git rev-parse from observation.cwd"
 else
   fail "_session-learner.sh did NOT derive remote — cwd field not wired through"
 fi
 
-if grep -q '"root":' "$SANDBOX/.claude/skills/_projects.json" 2>/dev/null && \
-   ! grep -q '"root": ""' "$SANDBOX/.claude/skills/_projects.json" 2>/dev/null; then
+if grep -q '"root":' "$SANDBOX/.claude/skills/_sinapsis-projects.json" 2>/dev/null && \
+   ! grep -q '"root": ""' "$SANDBOX/.claude/skills/_sinapsis-projects.json" 2>/dev/null; then
   pass "_session-learner.sh derives root via git rev-parse from observation.cwd"
 else
   fail "_session-learner.sh did NOT derive root — root is empty in registry"

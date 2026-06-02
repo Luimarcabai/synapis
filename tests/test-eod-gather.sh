@@ -2,7 +2,7 @@
 # Tests for core/_eod-gather.sh — Multi-project EOD data collector (v4.2.3)
 # Drives the REAL script in a hermetic temp dir via SINAPSIS_HOMUNCULUS/SINAPSIS_SKILLS.
 # Covers Bug 1 (non-git root observations) + Bug 2 (cross-OS robustness) + the
-# canonical _projects.json registry loader.
+# canonical _sinapsis-projects.json registry loader.
 # Run: bash tests/test-eod-gather.sh
 
 PASS=0
@@ -99,11 +99,11 @@ H=$(mktemp -d)/homunculus; mkdir -p "$H"   # deliberately no projects/ and no ob
 C=$(run_gather "$H" | field "r.project_count")
 [ "$C" = "0" ] && pass "Empty homunculus → 0 projects" || fail "Expected 0, got '$C'"
 
-# ── TEST 7: Canonical _projects.json (array schema) resolves project name ──
-echo "--- Test 7: Canonical _projects.json name resolution ---"
+# ── TEST 7: Canonical _sinapsis-projects.json (array schema) resolves project name ──
+echo "--- Test 7: Canonical _sinapsis-projects.json name resolution ---"
 H=$(newhome); SK=$(mktemp -d); mkdir -p "$H/projects/abc123canon"
 gen_obs "${TODAY}10:00:00Z" "Edit" "global" > "$H/projects/abc123canon/observations.jsonl"
-cat > "$SK/_projects.json" << 'EOF'
+cat > "$SK/_sinapsis-projects.json" << 'EOF'
 { "projects": [ { "id": "abc123canon", "name": "CanonName", "root": "" } ] }
 EOF
 NAME=$(run_gather "$H" "$SK" | field "r.projects.map(p=>p.name).join(',')")

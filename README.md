@@ -1,6 +1,6 @@
-# Sinapsis v4.6.0
+# Sinapsis v4.6.1
 
-[![Version](https://img.shields.io/badge/version-4.6.0-blue.svg)](https://github.com/Luispitik/sinapsis)
+[![Version](https://img.shields.io/badge/version-4.6.1-blue.svg)](https://github.com/Luispitik/sinapsis)
 [![Tests](https://img.shields.io/badge/tests-112%20passing-green.svg)](tests/)
 [![CI](https://github.com/Luispitik/sinapsis/actions/workflows/tests.yml/badge.svg)](https://github.com/Luispitik/sinapsis/actions)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
@@ -384,7 +384,7 @@ Use `/eod --quick` for a fast auto-generated summary, or `/eod --yesterday` to r
     _session-learner.sh        <-- Stop hook: writes context + detects patterns
     _dream.sh                  <-- Dream cycle: 5-module index hygiene
     _operator-state.json       <-- Your identity + decisions (cross-project)
-    _projects.json             <-- Project registry
+    _sinapsis-projects.json             <-- Project registry
   commands/                    <-- Slash commands (/evolve, /dream, etc.)
   homunculus/
     projects/{hash}/

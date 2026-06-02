@@ -32,7 +32,7 @@ El script lee en paralelo:
 - `_instinct-proposals.json`
 - `_instinct.log` (distribución por hora + heatmap 21d)
 - `_catalog.json` (skills)
-- `_projects.json` + `homunculus/projects/*/observations.jsonl`
+- `_sinapsis-projects.json` + `homunculus/projects/*/observations.jsonl`
 - `_operator-state.json` (decisiones estratégicas)
 
 Y escribe `~/.claude/skills/_dashboard.html` autocontenido (Chart.js + Google Fonts via CDN).
