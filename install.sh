@@ -70,7 +70,7 @@ fi
 # minors (as PR #24 did with 3.9-3.13) silently breaks on Python 3.14+.
 PYTHON_CMD=""
 for candidate in "py -3" python3 python python3.13 python3.12 python3.11; do
-    cmd=$(echo "$candidate" | awk '{print $1}')
+    cmd=${candidate%% *}
     if command -v "$cmd" >/dev/null 2>&1; then
         if $candidate --version 2>&1 | grep -qE "Python 3\."; then
             PYTHON_CMD="$candidate"
