@@ -120,7 +120,33 @@ process.stdin.on("end", () => {
     matches.push(inst);
   }
 
-  if (!matches.length) process.exit(0);
+  // v4.6.2: atomic index write, shared by the decay-only path and the occurrence-tracking
+  // path below. Skips while the dream cycle holds the lock (#6 race condition) and filters
+  // archived instincts out of the index (v4.4 — they stay in the log only).
+  function persistIndex() {
+    const indexPath = process.env.HOME + "/.claude/skills/_instincts-index.json";
+    const dreamLock = process.env.HOME + "/.claude/skills/_dream.lock";
+    if (fs.existsSync(dreamLock)) return;
+    index.instincts = index.instincts.filter(i => i.level !== "archived");
+    const tmpPath = indexPath + ".tmp";
+    fs.writeFileSync(tmpPath, JSON.stringify(index, null, 2));
+    fs.renameSync(tmpPath, indexPath);
+  }
+
+  if (!matches.length) {
+    // v4.6.2: persist decay demotions even when nothing matches. The shared write below
+    // sat after this early-exit, so on every no-match tool use the demotions were
+    // recomputed and then discarded — confirmed/draft instincts never actually decayed.
+    if (decayDirty) {
+      try {
+        persistIndex();
+        const decayed = instincts.filter(i => i._decayed).map(i => i.id + "(" + i.level + ")");
+        fs.appendFileSync(process.env.HOME + "/.claude/skills/_instinct.log",
+          new Date().toISOString() + " | (no-match) | DECAYED:" + decayed.join(",") + "\n");
+      } catch(e) {}
+    }
+    process.exit(0);
+  }
 
   // Separate drafts from injectable instincts
   const draftMatches = matches.filter(m => m.level === "draft");
@@ -206,20 +232,7 @@ process.stdin.on("end", () => {
         promoted.push(inst.id);
       }
     }
-    if (dirty || decayDirty) {
-      const indexPath = process.env.HOME + "/.claude/skills/_instincts-index.json";
-      // v4.3.1: skip write if dream cycle holds the lock (#6 race condition)
-      const dreamLock = process.env.HOME + "/.claude/skills/_dream.lock";
-      if (fs.existsSync(dreamLock)) {
-        // Dream cycle is running — skip write to avoid data loss
-      } else {
-        // v4.4: filter out archived instincts from index (they stay in log only)
-        index.instincts = index.instincts.filter(i => i.level !== "archived");
-        const tmpPath = indexPath + ".tmp";
-        fs.writeFileSync(tmpPath, JSON.stringify(index, null, 2));
-        fs.renameSync(tmpPath, indexPath);
-      }
-    }
+    if (dirty || decayDirty) persistIndex();
   } catch(e) {}
 
   // Log activations (audit trail — kept as backup)
