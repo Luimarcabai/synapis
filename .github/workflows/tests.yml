@@ -42,3 +42,7 @@ jobs:
       - name: Run v4.3.3 hardening tests
         shell: bash
         run: bash tests/test-v433-hardening.sh
+
+      - name: Run BOM / decay / Python detection regression tests
+        shell: bash
+        run: bash tests/test-bom-decay-python.sh
