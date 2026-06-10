@@ -6,6 +6,7 @@
 #         (inspired by fs-cortex project-scoped instincts — credit: Fernando Montero)
 # v4.4: confidence decay — confirmed(60d inactive)→draft, draft(90d inactive)→archived
 #       (inspired by gstack learnings confidence decay — credit: garrytan/gstack)
+# v4.6.2: BOM-safe index read (#16) + decay demotions persisted on the no-match path
 
 INDEX_FILE="$HOME/.claude/skills/_instincts-index.json"
 LOG_FILE="$HOME/.claude/skills/_instinct.log"
@@ -33,7 +34,11 @@ process.stdin.on("end", () => {
 
   let index;
   try {
-    index = JSON.parse(fs.readFileSync(process.env.HOME + "/.claude/skills/_instincts-index.json", "utf8"));
+    // v4.6.2: strip UTF-8 BOM (#16) — Windows editors and PowerShell redirects add one,
+    // JSON.parse throws on it and the catch made the whole hook a silent no-op.
+    let raw = fs.readFileSync(process.env.HOME + "/.claude/skills/_instincts-index.json", "utf8");
+    if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
+    index = JSON.parse(raw);
   } catch(e) { process.exit(0); }
 
   const instincts = index.instincts || [];

@@ -55,9 +55,17 @@ function baseName(p) {
 // Load project registry for names and roots.
 // Primary: canonical _sinapsis-projects.json (array schema, populated by _session-learner.sh).
 // Fallback: legacy homunculus/projects.json (map schema, kept for back-compat).
+// v4.6.2: strip UTF-8 BOM before JSON.parse (#16) — Windows editors and PowerShell
+// redirects add one, and JSON.parse throws on it, silently dropping the registry.
+function readJson(p) {
+  let raw = fs.readFileSync(p, "utf8");
+  if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
+  return JSON.parse(raw);
+}
+
 let registry = {};
 try {
-  const canonical = JSON.parse(fs.readFileSync(path.join(skillsDir, "_sinapsis-projects.json"), "utf8"));
+  const canonical = readJson(path.join(skillsDir, "_sinapsis-projects.json"));
   if (canonical && Array.isArray(canonical.projects)) {
     for (const p of canonical.projects) {
       if (p && p.id) registry[p.id] = { name: p.name, root: p.root };
@@ -65,7 +73,7 @@ try {
   }
 } catch(e) {}
 try {
-  const legacy = JSON.parse(fs.readFileSync(path.join(homunculus, "projects.json"), "utf8"));
+  const legacy = readJson(path.join(homunculus, "projects.json"));
   for (const [k, v] of Object.entries(legacy || {})) {
     if (!registry[k]) registry[k] = v;
   }

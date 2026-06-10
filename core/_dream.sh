@@ -53,7 +53,10 @@ try {
 // ── READ INDEX ────────────────────────────────────────────────────────────────
 let index;
 try {
-  index = JSON.parse(fs.readFileSync(INDEX_FILE, "utf8"));
+  // v4.6.2: strip UTF-8 BOM (#16) — JSON.parse throws on it, aborting the dream cycle
+  let rawIndex = fs.readFileSync(INDEX_FILE, "utf8");
+  if (rawIndex.charCodeAt(0) === 0xFEFF) rawIndex = rawIndex.slice(1);
+  index = JSON.parse(rawIndex);
 } catch (e) { process.exit(0); }
 
 const instincts = index.instincts || [];
