@@ -1,5 +1,19 @@
 # Changelog
 
+## v4.6.2 (2026-06-10)
+
+### Fixed
+
+- **A UTF-8 BOM silently disabled the whole pipeline** (#16, reported by @juanparisma): `JSON.parse` throws on a UTF-8 BOM, and every JSON reader wrapped it in a catch that exits 0 — so an `_instincts-index.json` (or registry/rules/proposals file) saved by a Windows editor or a PowerShell redirect stopped occurrence tracking, learning, passive rules, dream, eod and the project-context bridge with no error anywhere. All readers now strip the BOM before parsing: `_instinct-activator.sh`, `_session-learner.sh` (5 read sites via a `readJson` helper), `_dream.sh`, `_eod-gather.sh`, `_passive-activator.sh`, `_project-context.sh`; `_generate-dashboard.py` reads with `encoding='utf-8-sig'`. Writers never emit a BOM, so the first atomic write after a read self-heals the file.
+- **Confidence-decay demotions were discarded on the no-match path** (`_instinct-activator.sh`): the v4.4 decay pass demotes stale instincts (confirmed 60d inactive → draft, draft 90d inactive → archived) before matching, but the only index write sat after the no-match early-exit — on every tool use that matched nothing, demotions were recomputed and thrown away. In practice stale instincts never decayed unless some other instinct happened to match in the same invocation. The atomic write is now extracted into `persistIndex()` (dream-lock check and archived filtering preserved) and runs before the early-exit when decay demoted anything, logging the demotions to `_instinct.log` as the matched path already did.
+- **Microsoft Store python3 shim aborted install.sh and silenced observe.sh** (aligned with #24, credit: @juanparisma): on Windows, `python3` commonly resolves to the Store alias shim — it answers `command -v` but does not execute. `install.sh` aborted under `set -e` at `PYTHON_VER=$(python3 --version)`, and `observe.sh` piped every observation into the shim, recording nothing. Both now iterate candidates (`py -3` first, the real Windows launcher) and only accept a command whose `--version` output reports `Python 3.` — any minor, deliberately not pinned to 3.9-3.13 as #24 proposed, which would silently reject Python 3.14+ (reproduced locally: 3.14.0 made observe.sh a no-op again). First word extracted with native expansion (no awk fork in the per-tool-use hot path). No behaviour change on macOS/Linux, where `py` does not exist and the loop falls through to the real `python3`.
+
+### Tests
+
+- New `tests/test-bom-decay-python.sh` — 12 tests: A/B BOM repros for the activator (injection + occurrence persistence), BOM-strip presence in all 6 core readers, `utf-8-sig` in the dashboard generator, a functional BOM-prefixed passive-rules run, decay demotion/archival on the no-match path, no spurious rewrites for fresh indexes, and Python detection (candidate loop asserted in both installers; functional run with a fake Store shim that answers `command -v` but fails `--version`, asserting the real interpreter is selected).
+
+---
+
 ## v4.6.1 (2026-06-02)
 
 ### Fixed

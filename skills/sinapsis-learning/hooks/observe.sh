@@ -24,17 +24,28 @@ esac
 [ "${ECC_HOOK_PROFILE:-standard}" = "minimal" ] && exit 0
 [ "${ECC_SKIP_OBSERVE:-0}" = "1" ] && exit 0
 
-# Find Python
+# Find Python — validate --version before accepting a command (aligned with PR #24).
+# On Windows, `python3` is often the Microsoft Store alias shim: it answers
+# `command -v` but does NOT execute (prints a notice and exits non-zero). Without
+# validation, observe.sh accepted the shim and the observer failed silently.
+# `py -3` (the real Windows launcher) is tried first; it does not exist on
+# macOS/Linux, so the loop falls through to the real python3 there.
+# The check is "Python 3." (any minor): the shim never prints that, and pinning
+# minors (as PR #24 did with 3.9-3.13) silently breaks on Python 3.14+.
 PYTHON_CMD=""
-if command -v python3 >/dev/null 2>&1; then
-  PYTHON_CMD="python3"
-elif command -v python >/dev/null 2>&1 && python --version 2>&1 | grep -q "Python 3"; then
-  PYTHON_CMD="python"
-fi
+for candidate in "py -3" python3 python python3.13 python3.12 python3.11; do
+  cmd=${candidate%% *}  # first word, no forks — this runs on every PreToolUse/PostToolUse
+  if command -v "$cmd" >/dev/null 2>&1; then
+    if $candidate --version 2>&1 | grep -qE "Python 3\."; then
+      PYTHON_CMD="$candidate"
+      break
+    fi
+  fi
+done
 [ -z "$PYTHON_CMD" ] && exit 0
 
-# Run the observer
+# Run the observer ($PYTHON_CMD unquoted: "py -3" is two words)
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-echo "$INPUT_JSON" | "$PYTHON_CMD" "$SCRIPT_DIR/observe_v3.py" "$HOOK_PHASE"
+echo "$INPUT_JSON" | $PYTHON_CMD "$SCRIPT_DIR/observe_v3.py" "$HOOK_PHASE"
 
 exit 0

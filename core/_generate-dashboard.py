@@ -33,7 +33,8 @@ TEMPLATE = _sibling_tpl if _sibling_tpl.exists() else SKILLS / '_dashboard-templ
 
 def load_json(path: Path, default):
     try:
-        return json.loads(path.read_text(encoding='utf-8'))
+        # utf-8-sig tolerates a UTF-8 BOM (#16) — plain utf-8 makes json.loads raise
+        return json.loads(path.read_text(encoding='utf-8-sig'))
     except Exception:
         return default
 

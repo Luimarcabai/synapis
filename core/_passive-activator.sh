@@ -22,7 +22,12 @@ process.stdin.on("end", () => {
   try { data = JSON.parse(input); } catch(e) { process.exit(0); }
 
   let cfg;
-  try { cfg = JSON.parse(fs.readFileSync(process.argv[1], "utf8")); } catch(e) { process.exit(0); }
+  try {
+    // v4.6.2: strip UTF-8 BOM (#16) — JSON.parse throws on it, silently disabling all rules
+    let raw = fs.readFileSync(process.argv[1], "utf8");
+    if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
+    cfg = JSON.parse(raw);
+  } catch(e) { process.exit(0); }
 
   const rules = cfg.rules || [];
   if (rules.length === 0) process.exit(0);

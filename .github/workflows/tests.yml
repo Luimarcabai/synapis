@@ -42,3 +42,31 @@ jobs:
       - name: Run v4.3.3 hardening tests
         shell: bash
         run: bash tests/test-v433-hardening.sh
+
+      - name: Run BOM / decay / Python detection regression tests
+        shell: bash
+        run: bash tests/test-bom-decay-python.sh
+
+      - name: Run dashboard tests
+        shell: bash
+        run: bash tests/test-dashboard.sh
+
+      - name: Run EOD gather tests
+        shell: bash
+        run: bash tests/test-eod-gather.sh
+
+      - name: Run install/upgrade tests
+        shell: bash
+        run: bash tests/test-install-upgrade.sh
+
+      - name: Run registry isolation tests
+        shell: bash
+        run: bash tests/test-registry-isolation.sh
+
+      - name: Run v4.5 Opus 4.7 tests
+        shell: bash
+        run: bash tests/test-v45-opus47.sh
+
+      - name: Run v4.6 Opus 4.8 tests
+        shell: bash
+        run: bash tests/test-v46-opus48.sh

@@ -55,7 +55,10 @@ process.stdin.on("end", () => {
   try {
     const osPath = HOME + "/.claude/skills/_operator-state.json";
     if (fs.existsSync(osPath)) {
-      const os = JSON.parse(fs.readFileSync(osPath, "utf8"));
+      // v4.6.2: strip UTF-8 BOM (#16) — JSON.parse throws on it
+      let rawOs = fs.readFileSync(osPath, "utf8");
+      if (rawOs.charCodeAt(0) === 0xFEFF) rawOs = rawOs.slice(1);
+      const os = JSON.parse(rawOs);
       if (os.needsOnboarding === undefined && !os.operator) {
         // Schema is broken — missing both needsOnboarding and operator
         // Create a flag file so the skill-router knows to re-trigger onboarding

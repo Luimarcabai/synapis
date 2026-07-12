@@ -34,6 +34,14 @@ node -e '
 const fs = require("fs");
 const path = require("path");
 
+// v4.6.2: strip UTF-8 BOM before JSON.parse (#16) — Windows editors and PowerShell
+// redirects add one, and JSON.parse throws on it, silently disabling the reader.
+function readJson(p) {
+  let raw = fs.readFileSync(p, "utf8");
+  if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
+  return JSON.parse(raw);
+}
+
 const obsFile = process.argv[1];
 const indexFile = process.argv[2];
 const proposalsFile = process.argv[3];
@@ -93,7 +101,7 @@ try {
 } catch(e) {}
 // Legacy fallback: homunculus/projects.json (kept for back-compat with installs that created it)
 try {
-  const pj = JSON.parse(fs.readFileSync(process.env.HOME + "/.claude/homunculus/projects.json", "utf8"));
+  const pj = readJson(process.env.HOME + "/.claude/homunculus/projects.json");
   if (pj[projectHash]) {
     if (pj[projectHash].name && projectName === projectHash) projectName = pj[projectHash].name;
     if (pj[projectHash].root && !projectRoot) projectRoot = pj[projectHash].root;
@@ -194,7 +202,7 @@ try {
       // may have added entries between our earlier code and now).
       let registry;
       try {
-        registry = JSON.parse(fs.readFileSync(registryPath, "utf8"));
+        registry = readJson(registryPath);
       } catch(e) {
         registry = { version: "4.1", system: "sinapsis", projects: [], note: "Projects registered automatically by _session-learner.sh on Stop events." };
       }
@@ -232,14 +240,14 @@ try {
 // Read existing instincts to avoid re-proposing known patterns
 let existing = new Set();
 try {
-  const idx = JSON.parse(fs.readFileSync(indexFile, "utf8"));
+  const idx = readJson(indexFile);
   (idx.instincts || []).forEach(i => existing.add(i.id));
 } catch(e) {}
 
 // Load proposals for today (session-based, overwrites on new day)
 let proposals;
 try {
-  const raw = JSON.parse(fs.readFileSync(proposalsFile, "utf8"));
+  const raw = readJson(proposalsFile);
   proposals = (raw.session_date === today) ? raw : { version: "1.0", session_date: today, proposals: [] };
 } catch(e) {
   proposals = { version: "1.0", session_date: today, proposals: [] };
@@ -351,7 +359,7 @@ if (toolSeq.length >= 6) {
 // v4.3.3: cross-session memory. Reads prior proposals to find recurring error patterns.
 // Cortex tracks this via "repetitions (>3 sessions)" — we use proposal history.
 try {
-  const rawProposals = JSON.parse(fs.readFileSync(proposalsFile, "utf8"));
+  const rawProposals = readJson(proposalsFile);
   const priorPropDates = {};
   for (const p of (rawProposals.proposals || [])) {
     if (p.type === "error_resolution" && p.proposed_at) {
