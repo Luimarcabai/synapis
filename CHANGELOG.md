@@ -1,5 +1,39 @@
 # Changelog
 
+## v4.7.0 (2026-07-13)
+
+### Added — Sinapsis Teams (opt-in, OFF by default)
+
+- **Team knowledge sharing over plain git** (`core/_team-sync.sh` + `/team`): a development
+  team pools the instincts and project context each member's Sinapsis learned autonomously,
+  through a private per-team git repo. `init/join/pull/share/context/status/leave`
+  subcommands, all deterministic bash + node — no LLM, no server, no accounts. Decision and
+  trust model documented in `docs/TEAMS.md` (same repo as an optional module, NOT a fork:
+  the layer reuses the existing pipeline and touches **zero hooks**).
+- **Trust rules**: shares require `confirmed`/`permanent` (your usage must validate what you
+  publish); imports enter as `draft` (quarantine — never injected until the *importer's own
+  usage* validates them via the existing occurrence tracking/auto-promote, or `/promote`);
+  `permanent` is never importable; id collisions with personal instincts are skipped
+  (personal wins); teammate revisions re-enter quarantine.
+- **Safety**: share AND pull scrub with the same 8 secret patterns as `observe_v3.py`
+  (defense in depth); imports validate id shape (path-traversal safe), reject ReDoS-prone
+  triggers (same nested-quantifier guard as the passive activator) and cap inject length.
+  An import ledger per team makes pull idempotent and prevents resurrection of instincts
+  the operator deleted or downvoted.
+- **Per-project agent context**: `/team context push` publishes the current project's
+  `context.md` (scrubbed) keyed by git remote — the cross-machine-stable key; teammates get
+  it on `/team pull` before their first session in that repo.
+
+### Tests
+
+- New `tests/test-team.sh` — 18 hermetic tests driving the real script against a local bare
+  git remote with two sandboxed members: init/join/bootstrap, share gate + scrubbing +
+  attribution + push, draft quarantine, origin provenance, idempotent pull, no-resurrection,
+  personal-wins collision, permanent cap, hostile-payload rejection (ReDoS + traversal id),
+  revision re-quarantine, leave `--purge`. Registered in CI.
+
+---
+
 ## v4.6.2 (2026-06-10)
 
 ### Fixed
