@@ -43,19 +43,19 @@ process.stdin.on("end", () => {
   const context = tool + " " + inputContent;
 
   // Match rules: test trigger regex against context
-  const matched = [];
+  const matched = [], matchedIds = [];
   for (const rule of rules) {
     if (!rule.trigger || !rule.inject) continue;
     // EVERY_SESSION rules always fire
     if (rule.trigger === "EVERY_SESSION") {
-      matched.push(rule.inject);
+      matched.push(rule.inject); matchedIds.push(rule.id || "unknown");
       continue;
     }
     try {
       // v4.3.1: ReDoS protection — reject patterns with nested quantifiers
       if (/(\+|\*|\{)\)?(\+|\*|\{)/.test(rule.trigger)) continue;
       if (new RegExp(rule.trigger, "i").test(context)) {
-        matched.push(rule.inject);
+        matched.push(rule.inject); matchedIds.push(rule.id || "unknown");
       }
     } catch(e) { continue; }
   }
@@ -64,6 +64,14 @@ process.stdin.on("end", () => {
 
   // Cap at 3 rules to avoid token bloat
   const top = matched.slice(0, 3);
+  const topIds = matchedIds.slice(0, 3);
+  // Telemetry: log fired rules so the dashboard & /passive-status can track activations.
+  // Format: "TIMESTAMP | rule_id | tool" (rule_id between pipes, matches dashboard parser).
+  try {
+    const logPath = process.argv[1].replace(/_passive-rules\.json$/, "_passive.log");
+    const ts = new Date().toISOString();
+    fs.appendFileSync(logPath, topIds.map(id => ts + " | " + id + " | " + tool + "\n").join(""));
+  } catch(e) {}
   console.log(JSON.stringify({ systemMessage: top.join("\n") }));
 });
 ' "$RULES" 2>/dev/null

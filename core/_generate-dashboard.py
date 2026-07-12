@@ -143,9 +143,17 @@ def collect_skills():
 
 def collect_projects():
     proj = load_json(SKILLS / '_sinapsis-projects.json', {'projects': []})
-    active = [p for p in proj.get('projects', []) if p.get('active')]
+    # Map project_id (homunculus dir hash) -> friendly name from the registry.
+    id_to_name = {}
+    for p in proj.get('projects', []):
+        if p.get('id') and p.get('name'):
+            id_to_name[p['id']] = p['name']
     total_obs = 0
     proj_obs = []
+    # "Active" = a project whose observations were written within the last 14 days.
+    # The registry never sets an 'active' flag, so derive activity from real data.
+    active_recent = 0
+    now_ts = now_utc().timestamp()
     if HOMUNCULUS.exists():
         proj_dir = HOMUNCULUS / 'projects'
         if proj_dir.exists():
@@ -155,26 +163,42 @@ def collect_projects():
                     try:
                         n = sum(1 for _ in obs_file.open('r', encoding='utf-8', errors='replace'))
                         total_obs += n
-                        ctx = d / 'context.md'
-                        name = d.name
-                        if ctx.exists():
+                        # Friendly name: registry first, else last observation's project_name.
+                        name = id_to_name.get(d.name, d.name)
+                        if name == d.name:
                             try:
-                                for ln in ctx.read_text(encoding='utf-8').splitlines()[:5]:
-                                    if 'Proyecto' in ln or 'proyecto' in ln:
-                                        pass
+                                last = None
+                                for last in obs_file.open('r', encoding='utf-8', errors='replace'):
+                                    pass
+                                if last:
+                                    pn = json.loads(last).get('project_name')
+                                    if pn:
+                                        name = pn
                             except Exception:
                                 pass
+                        age_days = (now_ts - obs_file.stat().st_mtime) / 86400
+                        if age_days <= 14:
+                            active_recent += 1
                         proj_obs.append((name, n))
                     except Exception:
                         pass
     proj_obs.sort(key=lambda x: -x[1])
-    return len(active), total_obs, proj_obs[:18]
+    if active_recent == 0:
+        active_recent = len([p for p in proj.get('projects', []) if p.get('active')])
+    return active_recent, total_obs, proj_obs[:18]
 
 
 def collect_decisions():
     op = load_json(SKILLS / '_operator-state.json', {})
-    decs = op.get('strategicDecisions', [])
-    decs.sort(key=lambda d: d.get('date', ''), reverse=True)
+    raw = op.get('strategicDecisions', [])
+    # Tolerate both shapes: list of objects {id,date,decision} or list of strings.
+    decs = []
+    for d in raw:
+        if isinstance(d, dict):
+            decs.append(d)
+        elif isinstance(d, str):
+            decs.append({'id': None, 'date': '', 'decision': d})
+    decs.sort(key=lambda d: d.get('date', '') or '', reverse=True)
     return decs
 
 
