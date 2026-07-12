@@ -43,14 +43,19 @@ fi
 # T2: functional — two runs with identical input and shuffled index produce identical output
 setup_sandbox
 
+# last_triggered must be NOW, not hardcoded: the v4.4 confidence decay demotes
+# confirmed instincts inactive >60d to draft (not injected), so a fixed date makes
+# this suite fail 60 days after it was written (happened 2026-07: 2026-04-20 fixtures).
+NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
 # Build an index with 4 instincts of same level + occurrences — tiebreaker must pick alphabetical
-cat > "$SANDBOX/.claude/skills/_instincts-index.json" << 'EOFIDX'
+cat > "$SANDBOX/.claude/skills/_instincts-index.json" << EOFIDX
 {
   "version": "4.1",
   "instincts": [
-    {"id":"zebra","domain":"general","level":"confirmed","trigger_pattern":"Edit","inject":"Z rule","occurrences":5,"first_triggered":"2026-04-01","last_triggered":"2026-04-20"},
-    {"id":"alpha","domain":"security","level":"confirmed","trigger_pattern":"Edit","inject":"A rule","occurrences":5,"first_triggered":"2026-04-01","last_triggered":"2026-04-20"},
-    {"id":"mike","domain":"git","level":"confirmed","trigger_pattern":"Edit","inject":"M rule","occurrences":5,"first_triggered":"2026-04-01","last_triggered":"2026-04-20"}
+    {"id":"zebra","domain":"general","level":"confirmed","trigger_pattern":"Edit","inject":"Z rule","occurrences":5,"first_triggered":"$NOW","last_triggered":"$NOW"},
+    {"id":"alpha","domain":"security","level":"confirmed","trigger_pattern":"Edit","inject":"A rule","occurrences":5,"first_triggered":"$NOW","last_triggered":"$NOW"},
+    {"id":"mike","domain":"git","level":"confirmed","trigger_pattern":"Edit","inject":"M rule","occurrences":5,"first_triggered":"$NOW","last_triggered":"$NOW"}
   ],
   "archived": []
 }
@@ -60,13 +65,13 @@ INPUT='{"tool_name":"Edit","tool_input":{"file_path":"x.js"}}'
 OUT1=$(echo "$INPUT" | HOME="$SANDBOX" bash "$ACTIVATOR" 2>/dev/null)
 
 # Shuffle the on-disk order and rerun — result must be byte-identical
-cat > "$SANDBOX/.claude/skills/_instincts-index.json" << 'EOFIDX2'
+cat > "$SANDBOX/.claude/skills/_instincts-index.json" << EOFIDX2
 {
   "version": "4.1",
   "instincts": [
-    {"id":"mike","domain":"git","level":"confirmed","trigger_pattern":"Edit","inject":"M rule","occurrences":5,"first_triggered":"2026-04-01","last_triggered":"2026-04-20"},
-    {"id":"zebra","domain":"general","level":"confirmed","trigger_pattern":"Edit","inject":"Z rule","occurrences":5,"first_triggered":"2026-04-01","last_triggered":"2026-04-20"},
-    {"id":"alpha","domain":"security","level":"confirmed","trigger_pattern":"Edit","inject":"A rule","occurrences":5,"first_triggered":"2026-04-01","last_triggered":"2026-04-20"}
+    {"id":"mike","domain":"git","level":"confirmed","trigger_pattern":"Edit","inject":"M rule","occurrences":5,"first_triggered":"$NOW","last_triggered":"$NOW"},
+    {"id":"zebra","domain":"general","level":"confirmed","trigger_pattern":"Edit","inject":"Z rule","occurrences":5,"first_triggered":"$NOW","last_triggered":"$NOW"},
+    {"id":"alpha","domain":"security","level":"confirmed","trigger_pattern":"Edit","inject":"A rule","occurrences":5,"first_triggered":"$NOW","last_triggered":"$NOW"}
   ],
   "archived": []
 }
