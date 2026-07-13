@@ -28,41 +28,21 @@ Think of it as going from a dumb terminal to an assistant that actually knows yo
 
 ---
 
-## What's New in v4.7.0 — Sinapsis Plexus
+## What's New in v4.8.0 — Plexus moves to the team edition
 
-> Wire your team's synapses into one nervous system — peer-to-peer over git,
-> no server, trust earned by your own use.
+Sinapsis returns to what it has been since the v4.3.2 separation: **individual autonomous
+learning, and only that**. The team layer (Sinapsis Plexus — shared knowledge over a private
+git repo, PM directives, traceability, quarantine trust model) shipped here briefly as v4.7.0
+and now lives in the **private team edition**, where team-oriented development continues.
+Same clean-extraction pattern as the gstack separation in v4.3.2.
 
-A *plexus* is the anatomical level above the synapse: a network of nerves from multiple
-origins interweaving and redistributing signal, with no center. Every member's Sinapsis keeps
-learning on its own; Plexus is the network where the validated knowledge circulates.
-
-- **Plexus layer (opt-in, OFF by default)**: a development team pools the instincts and project
-  context each member's Sinapsis learned autonomously, through a plain private git repo. New
-  `/plexus` command: `init / join / pull / share / review / directive / log / context / status /
-  leave`. No server, no accounts, no LLM in the loop — git is the transport. Design + trust
-  model: [`docs/PLEXUS.md`](docs/PLEXUS.md).
-- **Zero hook changes**: imported instincts land in your index as ordinary `draft` entries with
-  `origin: plexus:<name>/<author>`. The existing pipeline (occurrence tracking, auto-promote,
-  decay, `/promote`, `/downvote`, dream cycle) validates them against **your own usage** —
-  nothing a teammate shares reaches your prompts unvalidated, and `permanent` is never
-  importable. `/plexus review` shows the quarantine queue.
-- **PM directives**: `/plexus directive` gives the project lead versioned guidelines in
-  `directives/` — human-readable, deterministically parseable, git history as audit trail.
-  Directives are context, never instincts: there is deliberately no code path importing them
-  into your index.
-- **Traceability, not surveillance**: `/plexus log` renders a metadata-only contribution
-  ledger (author, action, id, revision) — never session text, never consumption.
-- **Safety built in**: shares require `confirmed`+ (you can't publish what your usage hasn't
-  validated), secrets are scrubbed on share *and* on pull (same 8 patterns as the observer),
-  hostile payloads (ReDoS triggers, path-traversal ids) are rejected, a per-team import
-  ledger prevents deleted instincts from resurrecting, and the team repo carries a versioned
-  additive-only schema so external tools can build on it.
-- **Per-project agent context**: `/plexus context push` publishes the current project's context
-  keyed by git remote; teammates get it on `/plexus pull` — an agent's day-one briefing for a
-  repo it has never seen.
-- **28 new hermetic tests** (`tests/test-plexus.sh`) driving the real script against a local
-  bare git remote with two sandboxed members.
+- All Plexus code, commands, docs and tests removed from this repo (v4.7.0 remains in the
+  git history under MIT).
+- The public installer neither installs **nor removes** `_plexus-sync.sh` / `plexus.md` —
+  those files may belong to a team-edition install layered on top of this one.
+- New `tests/test-plexus-separation.sh` guards the boundary (no plexus references in live
+  code paths).
+- Interested in the team edition? It builds on exactly this individual pipeline — reach out.
 
 ## What's New in v4.6.0 — Opus 4.8
 

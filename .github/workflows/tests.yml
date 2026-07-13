@@ -71,6 +71,6 @@ jobs:
         shell: bash
         run: bash tests/test-v46-opus48.sh
 
-      - name: Run Sinapsis Plexus tests
+      - name: Run Plexus separation tests
         shell: bash
-        run: bash tests/test-plexus.sh
+        run: bash tests/test-plexus-separation.sh
