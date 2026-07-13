@@ -43,11 +43,14 @@ echo "[Section 1] UTF-8 BOM in JSON readers"
 
 setup_sandbox
 INDEX="$SANDBOX/.claude/skills/_instincts-index.json"
-cat > "$INDEX" << 'EOFIDX'
+# last_triggered must be NOW: a hardcoded date decays to draft (not injected) once it
+# falls >60d in the past, turning this suite into a time bomb.
+NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+cat > "$INDEX" << EOFIDX
 {
   "version": "4.1",
   "instincts": [
-    {"id":"bom-rule","domain":"general","level":"confirmed","trigger_pattern":"Edit","inject":"BOM survivor rule","occurrences":5,"first_triggered":"2026-04-01T00:00:00Z","last_triggered":"2026-06-01T00:00:00Z"}
+    {"id":"bom-rule","domain":"general","level":"confirmed","trigger_pattern":"Edit","inject":"BOM survivor rule","occurrences":5,"first_triggered":"$NOW","last_triggered":"$NOW"}
   ],
   "archived": []
 }
