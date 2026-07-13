@@ -1,8 +1,8 @@
-# Sinapsis v4.5 — Feature Reference
+# Sinapsis v4.7 — Feature Reference
 
 > Complete inventory of all features, commands, hooks, modules, and capabilities.
 > **Update this file with every feat/fix commit.**
-> Last updated: 2026-04-21
+> Last updated: 2026-07-13
 
 ---
 
@@ -26,6 +26,40 @@ Parallel systems (not part of the confidence pipeline):
 - **Passive Rules** (6 default) — deterministic regex rules, always fire on matcher
 - **Operator State** — strategic decisions persisted across all projects
 - **Skill Router** — on-demand skill loading from dormant catalog
+- **Sinapsis Plexus** (v4.7, opt-in) — share learned instincts, PM directives and project context with a team over a private git repo; imports feed INTO the confidence pipeline as drafts (see below)
+
+### Sinapsis Plexus — `_plexus-sync.sh` + `/plexus` (v4.7)
+
+> Wire your team's synapses into one nervous system — peer-to-peer over git, no server,
+> trust earned by your own use.
+
+Opt-in layer, OFF by default, zero hook changes. A per-team private git repo
+(`~/.claude/skills/_plexus/<name>/` clone) holds `instincts.json` (shared instincts with
+author/revision provenance), `directives/<id>.md` (versioned PM guidelines),
+`activity/<member>.ndjson` (metadata-only contribution ledger) and `context/<slug>.md`
+(per-project agent context keyed by git remote), under a versioned additive-only schema
+(`sinapsis-plexus.json`). Full design + trust model: [PLEXUS.md](PLEXUS.md).
+
+| Subcommand | Effect |
+|---|---|
+| `init` / `join` `<name> <git-url>` | Create/join a team (bootstraps empty remotes) |
+| `pull [name]` | Import new/updated instincts as `draft`, `origin: plexus:<name>/<author>` |
+| `share <name> <id>` | Publish a `confirmed`/`permanent` instinct (scrubbed, attributed) |
+| `review` | Quarantine queue: pending imports + distance to auto-promote |
+| `directive add/list/supersede` | PM guidelines as versioned files — context, never instincts |
+| `log [name] [--member <a>]` | Traceability timeline from the metadata ledger |
+| `context push/show <name>` | Share/read the current project's context (keyed by remote) |
+| `status` | Teams, shared/imported/pending counts, last sync |
+| `leave <name> [--purge]` | Remove clone + ledger (`--purge`: also that team's instincts) |
+
+Trust rules enforced by the script: share requires `confirmed`+; imports quarantine as
+`draft` and are validated by the importer's own usage (existing occurrence tracking /
+auto-promote / `/promote`); `permanent` never importable; personal instincts win id
+collisions; teammate revisions re-quarantine; secrets scrubbed on share AND pull AND
+directives AND context (8 observer patterns); ReDoS triggers and traversal ids rejected;
+per-team import ledger makes pull idempotent and prevents resurrection of deleted imports;
+activity ledger is metadata-only (traceability, not surveillance). 28 hermetic tests in
+`tests/test-plexus.sh`.
 
 ### Dual Injection Architecture
 

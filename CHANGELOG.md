@@ -1,5 +1,57 @@
 # Changelog
 
+## v4.7.0 (2026-07-13)
+
+### Added — Sinapsis Plexus (opt-in, OFF by default)
+
+> A *plexus* is the anatomical level above the synapse: a network of nerves from multiple
+> origins interweaving and redistributing signal with no center. Wire your team's synapses
+> into one nervous system — peer-to-peer over git, no server, trust earned by your own use.
+
+- **Team knowledge sharing over plain git** (`core/_plexus-sync.sh` + `/plexus`): a
+  development team pools the instincts and project context each member's Sinapsis learned
+  autonomously, through a private per-team git repo. `init/join/pull/share/review/directive/
+  log/context/status/leave` subcommands, all deterministic bash + node — no LLM, no server,
+  no accounts. Decision and trust model documented in `docs/PLEXUS.md` (same repo as an
+  optional module, NOT a fork: the layer reuses the existing pipeline and touches **zero hooks**).
+- **Trust rules**: shares require `confirmed`/`permanent` (your usage must validate what you
+  publish); imports enter as `draft` (quarantine — never injected until the *importer's own
+  usage* validates them via the existing occurrence tracking/auto-promote, or `/promote`);
+  `permanent` is never importable; id collisions with personal instincts are skipped
+  (personal wins); teammate revisions re-enter quarantine. `/plexus review` makes the
+  quarantine actionable: pending imports, who shared them, distance to auto-promote.
+- **PM directives** (`/plexus directive add|list|supersede`): project guidelines live as
+  versioned frontmatter files in `directives/` in the team repo — human-readable,
+  deterministically parseable, git history as audit trail. Deliberately **no code path**
+  imports a directive into the instincts index: top-down curated content injected as
+  instincts is the rejected seeds model (#8).
+- **Traceability, not surveillance** (`/plexus log`): `activity/<member>.ndjson` records
+  metadata of knowledge contributions only (author, action, id, revision) — never session
+  text, never consumption. Written by share/directive/context-push inside the same commit.
+- **Schema contract**: `sinapsis-plexus.json` carries `schema_version` with an additive-only
+  policy, so external consumers (dashboards, audit engines) can build on the team repo
+  without coupling to Sinapsis's release cadence.
+- **Safety**: share, pull, directives and context push scrub with the same 8 secret patterns
+  as `observe_v3.py` (defense in depth); imports validate id shape (path-traversal safe),
+  reject ReDoS-prone triggers (same nested-quantifier guard as the passive activator) and cap
+  inject length. An import ledger per team makes pull idempotent and prevents resurrection of
+  instincts the operator deleted or downvoted.
+- **Per-project agent context**: `/plexus context push` publishes the current project's
+  `context.md` (scrubbed) keyed by git remote — the cross-machine-stable key; teammates get
+  it on `/plexus pull` before their first session in that repo.
+
+### Tests
+
+- New `tests/test-plexus.sh` — 28 hermetic tests driving the real script against a local bare
+  git remote with two sandboxed members: init/join/bootstrap, share gate + scrubbing +
+  attribution + push, draft quarantine, origin provenance, idempotent pull, no-resurrection,
+  personal-wins collision, permanent cap, hostile-payload rejection (ReDoS + traversal id),
+  revision re-quarantine, directives (create/push/list/supersede/path-safety/never-imported),
+  metadata-only activity ledger, log timeline, review queue, schema_version, leave `--purge`.
+  Registered in CI.
+
+---
+
 ## v4.6.2 (2026-06-10)
 
 ### Fixed

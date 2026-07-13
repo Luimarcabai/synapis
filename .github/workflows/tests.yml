@@ -70,3 +70,7 @@ jobs:
       - name: Run v4.6 Opus 4.8 tests
         shell: bash
         run: bash tests/test-v46-opus48.sh
+
+      - name: Run Sinapsis Plexus tests
+        shell: bash
+        run: bash tests/test-plexus.sh
