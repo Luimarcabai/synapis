@@ -3,7 +3,7 @@ chcp 65001 >nul 2>&1
 setlocal enabledelayedexpansion
 
 :: ============================================================
-::  Sinapsis v4.7 — Installer for Windows
+::  Sinapsis v4.8 — Installer for Windows
 ::  Skills on Demand for Claude Code
 ::  https://github.com/Luispitik/sinapsis
 :: ============================================================
@@ -18,7 +18,7 @@ set "SCRIPT_DIR=%~dp0"
 
 echo.
 echo ============================================================
-echo   Sinapsis v4.7 -- Skills on Demand for Claude Code
+echo   Sinapsis v4.8 -- Skills on Demand for Claude Code
 echo   The system that learns and adapts to you
 echo ============================================================
 echo.
@@ -151,9 +151,11 @@ copy /Y "%SCRIPT_DIR%core\_project-context.sh" "%SKILLS_DIR%\_project-context.sh
 copy /Y "%SCRIPT_DIR%core\_eod-gather.sh" "%SKILLS_DIR%\_eod-gather.sh" >nul
 copy /Y "%SCRIPT_DIR%core\_dream.sh" "%SKILLS_DIR%\_dream.sh" >nul
 copy /Y "%SCRIPT_DIR%core\_precompact-guard.sh" "%SKILLS_DIR%\_precompact-guard.sh" >nul
-copy /Y "%SCRIPT_DIR%core\_plexus-sync.sh" "%SKILLS_DIR%\_plexus-sync.sh" >nul
 
-echo   OK 6 hook scripts + dream cycle + Plexus sync installed
+:: NOTE (v4.8.0): the team layer (Plexus) lives in the private team edition.
+:: This installer neither installs nor removes _plexus-sync.sh / plexus.md.
+
+echo   OK 6 hook scripts + dream cycle installed
 echo   NOTE: On Windows, hooks run via Git Bash or WSL. See README for details.
 
 :: Step 6: Configure settings.json
@@ -198,9 +200,9 @@ echo   OK %cmd_count% commands installed
 echo.
 echo ============================================================
 if "%UPGRADING%"=="true" (
-    echo   Sinapsis v4.7 upgrade complete!
+    echo   Sinapsis v4.8 upgrade complete!
 ) else (
-    echo   Sinapsis v4.7 installed!
+    echo   Sinapsis v4.8 installed!
 )
 echo ============================================================
 echo.

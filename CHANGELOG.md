@@ -1,5 +1,24 @@
 # Changelog
 
+## v4.8.0 (2026-07-13)
+
+### Changed — Sinapsis Plexus extracted to the private team edition
+
+- **Sinapsis returns to individual-only autonomous learning.** The team layer (Plexus:
+  shared knowledge over a private git repo, PM directives, metadata-only traceability,
+  quarantine trust model) shipped here as v4.7.0 and now lives in the private team edition,
+  where team-oriented development continues. Same clean-extraction pattern as the gstack
+  separation in v4.3.2: `core/_plexus-sync.sh`, `commands/plexus.md`, `docs/PLEXUS.md` and
+  `tests/test-plexus.sh` removed; installers and CI updated. v4.7.0 remains in the git
+  history under MIT.
+- **The public installer neither installs nor removes** `_plexus-sync.sh` / `plexus.md`:
+  those files may belong to a team-edition install layered on top of this one, so the
+  v4.8 upgrade never touches them (deliberately NOT added to the legacy-cleanup list).
+- New `tests/test-plexus-separation.sh` guards the boundary: no plexus references in live
+  code paths (core/, commands/, installers, CI); history and changelog references stay.
+
+---
+
 ## v4.7.0 (2026-07-13)
 
 ### Added — Sinapsis Plexus (opt-in, OFF by default)

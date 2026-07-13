@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-#  Sinapsis v4.7 — Installer for macOS / Linux
+#  Sinapsis v4.8 — Installer for macOS / Linux
 #  Skills on Demand for Claude Code
 #  https://github.com/Luispitik/sinapsis
 # ============================================================
@@ -28,7 +28,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 echo ""
 echo -e "${PURPLE}${BOLD}============================================================${NC}"
-echo -e "${PURPLE}${BOLD}  Sinapsis v4.7 — Skills on Demand for Claude Code${NC}"
+echo -e "${PURPLE}${BOLD}  Sinapsis v4.8 — Skills on Demand for Claude Code${NC}"
 echo -e "${PURPLE}${BOLD}  The system that learns and adapts to you${NC}"
 echo -e "${PURPLE}${BOLD}============================================================${NC}"
 echo ""
@@ -177,7 +177,6 @@ cp "$SCRIPT_DIR/core/_project-context.sh" "$SKILLS_DIR/_project-context.sh"
 cp "$SCRIPT_DIR/core/_eod-gather.sh" "$SKILLS_DIR/_eod-gather.sh"
 cp "$SCRIPT_DIR/core/_dream.sh" "$SKILLS_DIR/_dream.sh"
 cp "$SCRIPT_DIR/core/_precompact-guard.sh" "$SKILLS_DIR/_precompact-guard.sh"
-cp "$SCRIPT_DIR/core/_plexus-sync.sh" "$SKILLS_DIR/_plexus-sync.sh"
 cp "$SCRIPT_DIR/core/_generate-dashboard.py" "$SKILLS_DIR/_generate-dashboard.py"
 cp "$SCRIPT_DIR/core/_dashboard-template.html" "$SKILLS_DIR/_dashboard-template.html"
 
@@ -188,10 +187,13 @@ chmod +x "$SKILLS_DIR/_project-context.sh"
 chmod +x "$SKILLS_DIR/_eod-gather.sh"
 chmod +x "$SKILLS_DIR/_dream.sh"
 chmod +x "$SKILLS_DIR/_precompact-guard.sh"
-chmod +x "$SKILLS_DIR/_plexus-sync.sh"
 chmod +x "$SKILLS_DIR/_generate-dashboard.py" 2>/dev/null || true
 
-echo -e "${GREEN}  OK${NC} 6 hook scripts + dream cycle + dashboard generator + Plexus sync installed"
+# NOTE (v4.8.0): the team layer (Plexus) lives in the private team edition.
+# This installer neither installs NOR removes _plexus-sync.sh / plexus.md —
+# they may belong to a team-edition install layered on top of this one.
+
+echo -e "${GREEN}  OK${NC} 6 hook scripts + dream cycle + dashboard generator installed"
 
 # ── Step 5b: Legacy file cleanup (v4.3.3) ──
 LEGACY_CLEANED=0
@@ -279,9 +281,9 @@ echo -e "${GREEN}  OK${NC} $cmd_count commands installed"
 echo ""
 echo -e "${GREEN}${BOLD}============================================================${NC}"
 if $UPGRADING; then
-    echo -e "${GREEN}${BOLD}  Sinapsis v4.7 upgrade complete!${NC}"
+    echo -e "${GREEN}${BOLD}  Sinapsis v4.8 upgrade complete!${NC}"
 else
-    echo -e "${GREEN}${BOLD}  Sinapsis v4.7 installed!${NC}"
+    echo -e "${GREEN}${BOLD}  Sinapsis v4.8 installed!${NC}"
 fi
 echo -e "${GREEN}${BOLD}============================================================${NC}"
 echo ""
