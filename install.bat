@@ -151,9 +151,9 @@ copy /Y "%SCRIPT_DIR%core\_project-context.sh" "%SKILLS_DIR%\_project-context.sh
 copy /Y "%SCRIPT_DIR%core\_eod-gather.sh" "%SKILLS_DIR%\_eod-gather.sh" >nul
 copy /Y "%SCRIPT_DIR%core\_dream.sh" "%SKILLS_DIR%\_dream.sh" >nul
 copy /Y "%SCRIPT_DIR%core\_precompact-guard.sh" "%SKILLS_DIR%\_precompact-guard.sh" >nul
-copy /Y "%SCRIPT_DIR%core\_team-sync.sh" "%SKILLS_DIR%\_team-sync.sh" >nul
+copy /Y "%SCRIPT_DIR%core\_plexus-sync.sh" "%SKILLS_DIR%\_plexus-sync.sh" >nul
 
-echo   OK 6 hook scripts + dream cycle + team sync installed
+echo   OK 6 hook scripts + dream cycle + Plexus sync installed
 echo   NOTE: On Windows, hooks run via Git Bash or WSL. See README for details.
 
 :: Step 6: Configure settings.json

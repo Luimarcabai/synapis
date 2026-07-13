@@ -177,7 +177,7 @@ cp "$SCRIPT_DIR/core/_project-context.sh" "$SKILLS_DIR/_project-context.sh"
 cp "$SCRIPT_DIR/core/_eod-gather.sh" "$SKILLS_DIR/_eod-gather.sh"
 cp "$SCRIPT_DIR/core/_dream.sh" "$SKILLS_DIR/_dream.sh"
 cp "$SCRIPT_DIR/core/_precompact-guard.sh" "$SKILLS_DIR/_precompact-guard.sh"
-cp "$SCRIPT_DIR/core/_team-sync.sh" "$SKILLS_DIR/_team-sync.sh"
+cp "$SCRIPT_DIR/core/_plexus-sync.sh" "$SKILLS_DIR/_plexus-sync.sh"
 cp "$SCRIPT_DIR/core/_generate-dashboard.py" "$SKILLS_DIR/_generate-dashboard.py"
 cp "$SCRIPT_DIR/core/_dashboard-template.html" "$SKILLS_DIR/_dashboard-template.html"
 
@@ -188,10 +188,10 @@ chmod +x "$SKILLS_DIR/_project-context.sh"
 chmod +x "$SKILLS_DIR/_eod-gather.sh"
 chmod +x "$SKILLS_DIR/_dream.sh"
 chmod +x "$SKILLS_DIR/_precompact-guard.sh"
-chmod +x "$SKILLS_DIR/_team-sync.sh"
+chmod +x "$SKILLS_DIR/_plexus-sync.sh"
 chmod +x "$SKILLS_DIR/_generate-dashboard.py" 2>/dev/null || true
 
-echo -e "${GREEN}  OK${NC} 6 hook scripts + dream cycle + dashboard generator + team sync installed"
+echo -e "${GREEN}  OK${NC} 6 hook scripts + dream cycle + dashboard generator + Plexus sync installed"
 
 # ── Step 5b: Legacy file cleanup (v4.3.3) ──
 LEGACY_CLEANED=0

@@ -1,25 +1,32 @@
 #!/bin/bash
-# Sinapsis Teams — deterministic team knowledge sync (v4.7.0)
+# Sinapsis Plexus — deterministic team knowledge sync (v4.7.0)
 #
 # Shares knowledge each member's Sinapsis learned autonomously through a plain
 # per-team git repo. NO hook changes: imported instincts land in the personal
 # _instincts-index.json as ordinary draft entries and are validated by the
 # existing pipeline (occurrence tracking, auto-promote, decay, /promote,
-# /downvote, dream cycle). See docs/TEAMS.md for the design and trust model.
+# /downvote, dream cycle). See docs/PLEXUS.md for the design and trust model.
 #
 # Usage:
-#   _team-sync.sh init  <name> <git-url>     create a team (bootstraps empty remote)
-#   _team-sync.sh join  <name> <git-url>     join an existing team
-#   _team-sync.sh pull  [name]               import new/updated team knowledge
-#   _team-sync.sh share <name> <instinct-id> publish one of your validated instincts
-#   _team-sync.sh context push|show <name>   share/read per-project agent context
-#   _team-sync.sh status                     teams, counts, last sync
-#   _team-sync.sh leave <name> [--purge]     remove team (--purge: also its instincts)
+#   _plexus-sync.sh init  <name> <git-url>     create a team (bootstraps empty remote)
+#   _plexus-sync.sh join  <name> <git-url>     join an existing team
+#   _plexus-sync.sh pull  [name]               import new/updated team knowledge
+#   _plexus-sync.sh share <name> <instinct-id> publish one of your validated instincts
+#   _plexus-sync.sh review                     list pending team imports awaiting your validation
+#   _plexus-sync.sh directive add <id> --text "..." [--scope <slug>] [--team <name>]
+#   _plexus-sync.sh directive list [--all] [--team <name>]
+#   _plexus-sync.sh directive supersede <id> [--team <name>]
+#   _plexus-sync.sh log [name] [--member <a>]  traceability: who contributed what, when
+#   _plexus-sync.sh context push|show <name>   share/read per-project agent context
+#   _plexus-sync.sh status                     teams, counts, last sync
+#   _plexus-sync.sh leave <name> [--purge]     remove team (--purge: also its instincts)
 #
 # Deterministic bash + node, no LLM. Git is the transport; no server, no accounts.
+# Traceability red line: activity/ records METADATA of knowledge contributions only
+# (never session text, never consumption) — knowledge traceability, not surveillance.
 
 SKILLS="$HOME/.claude/skills"
-TEAMS_DIR="$SKILLS/_team"
+PLEXUS_DIR="$SKILLS/_plexus"
 INDEX="$SKILLS/_instincts-index.json"
 
 CMD="${1:-}"
@@ -50,16 +57,41 @@ push_with_retry() {
   git -C "$1" push -q
 }
 
+# When the operator belongs to exactly one team, commands may omit the name.
+resolve_single_team() {
+  RESOLVED=""
+  local count=0 t
+  for t in "$PLEXUS_DIR"/*/; do
+    [ -f "$t/instincts.json" ] || continue
+    count=$((count + 1)); RESOLVED="$(basename "$t")"
+  done
+  [ "$count" = "1" ] || die "you belong to $count teams — pass --team <name>"
+}
+
+# Metadata-only activity ledger: what knowledge moved, never its text.
+# append_activity <clone> <author> <action> <id> <rev>
+append_activity() {
+  node -e '
+    const fs = require("fs"), path = require("path");
+    const [clone, author, action, id, rev] = process.argv.slice(1);
+    const dir = path.join(clone, "activity");
+    fs.mkdirSync(dir, { recursive: true });
+    const safe = (author.replace(/[^A-Za-z0-9._-]/g, "_") || "unknown").slice(0, 40);
+    fs.appendFileSync(path.join(dir, safe + ".ndjson"),
+      JSON.stringify({ ts: new Date().toISOString(), author: author, action: action, id: id, rev: Number(rev) || 1 }) + "\n");
+  ' "$1" "$2" "$3" "$4" "$5" 2>/dev/null
+}
+
 case "$CMD" in
 
   # ── init / join ─────────────────────────────────────────────────────────────
   init|join)
     NAME="${1:-}"; URL="${2:-}"
-    [ -z "$NAME" ] || [ -z "$URL" ] && die "usage: _team-sync.sh $CMD <name> <git-url>"
+    [ -z "$NAME" ] || [ -z "$URL" ] && die "usage: _plexus-sync.sh $CMD <name> <git-url>"
     validate_name "$NAME"
-    CLONE="$TEAMS_DIR/$NAME"
+    CLONE="$PLEXUS_DIR/$NAME"
     [ -d "$CLONE" ] && die "team '$NAME' already exists at $CLONE"
-    mkdir -p "$TEAMS_DIR"
+    mkdir -p "$PLEXUS_DIR"
     git clone --quiet "$URL" "$CLONE" 2>/dev/null || die "could not clone $URL"
 
     if [ ! -f "$CLONE/instincts.json" ]; then
@@ -68,35 +100,38 @@ case "$CMD" in
         const fs = require("fs"), path = require("path");
         const clone = process.argv[1], team = process.argv[2];
         const now = new Date().toISOString();
-        fs.writeFileSync(path.join(clone, "sinapsis-team.json"), JSON.stringify({
-          version: "1.0", system: "sinapsis-teams", team: team, created: now,
+        fs.writeFileSync(path.join(clone, "sinapsis-plexus.json"), JSON.stringify({
+          version: "1.0", system: "sinapsis-plexus", schema_version: 1, team: team, created: now,
+          _schema_policy: "additive-only: consumers must tolerate unknown fields; existing fields are never repurposed",
           policy: {
             import_level: "draft",
-            _note: "Level for incoming instincts on /team pull. draft (default) = quarantine, validated by each member own usage. confirmed = trusted team. permanent is NEVER importable."
+            _note: "Level for incoming instincts on /plexus pull. draft (default) = quarantine, validated by each member own usage. confirmed = trusted team. permanent is NEVER importable."
           }
         }, null, 2) + "\n");
         fs.writeFileSync(path.join(clone, "instincts.json"),
           JSON.stringify({ version: "1.0", instincts: [] }, null, 2) + "\n");
-        fs.mkdirSync(path.join(clone, "context"), { recursive: true });
-        fs.writeFileSync(path.join(clone, "context", ".gitkeep"), "");
+        for (const d of ["context", "directives", "activity"]) {
+          fs.mkdirSync(path.join(clone, d), { recursive: true });
+          fs.writeFileSync(path.join(clone, d, ".gitkeep"), "");
+        }
       ' "$CLONE" "$NAME" || die "bootstrap failed"
       git -C "$CLONE" add -A >/dev/null 2>&1
       git -C "$CLONE" commit -qm "chore(team): bootstrap sinapsis team '$NAME'" >/dev/null 2>&1
       git -C "$CLONE" push -q -u origin HEAD >/dev/null 2>&1 \
         || echo "WARN: could not push bootstrap (push manually from $CLONE)"
-      echo "Team '$NAME' created. Share your first instinct: /team share $NAME <instinct-id>"
+      echo "Team '$NAME' created. Share your first instinct: /plexus share $NAME <instinct-id>"
     else
-      echo "Joined team '$NAME'. Import its knowledge: /team pull $NAME"
+      echo "Joined team '$NAME'. Import its knowledge: /plexus pull $NAME"
     fi
     ;;
 
   # ── share ───────────────────────────────────────────────────────────────────
   share)
     NAME="${1:-}"; IID="${2:-}"
-    [ -z "$NAME" ] || [ -z "$IID" ] && die "usage: _team-sync.sh share <name> <instinct-id>"
+    [ -z "$NAME" ] || [ -z "$IID" ] && die "usage: _plexus-sync.sh share <name> <instinct-id>"
     validate_name "$NAME"
-    CLONE="$TEAMS_DIR/$NAME"
-    [ -d "$CLONE" ] || die "no team '$NAME' — run /team join first"
+    CLONE="$PLEXUS_DIR/$NAME"
+    [ -d "$CLONE" ] || die "no team '$NAME' — run /plexus join first"
     resolve_author
     git -C "$CLONE" pull --rebase -q 2>/dev/null
 
@@ -154,20 +189,205 @@ case "$CMD" in
       console.log("shared \"" + iid + "\" (rev " + entry.revision + ") as " + author);
     ' "$INDEX" "$CLONE" "$IID" "$AUTHOR" || exit $?
 
+    # Traceability: metadata only (id + revision), never the knowledge text.
+    REV="$(node -e 'try{const t=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));const i=(t.instincts||[]).find(x=>x&&x.id===process.argv[2]);console.log(i&&i.revision||1)}catch(e){console.log(1)}' "$CLONE/instincts.json" "$IID")"
+    append_activity "$CLONE" "$AUTHOR" share "$IID" "$REV"
+
     git -C "$CLONE" add -A >/dev/null 2>&1
     git -C "$CLONE" commit -qm "feat(team): share $IID" >/dev/null 2>&1
     push_with_retry "$CLONE" || die "push failed — check remote access"
     ;;
 
+  # ── review: make the quarantine actionable ──────────────────────────────────
+  review)
+    node -e '
+      const fs = require("fs");
+      let raw;
+      try {
+        raw = fs.readFileSync(process.argv[1], "utf8");
+        if (raw.charCodeAt(0) === 0xFEFF) raw = raw.slice(1);
+      } catch (e) { console.log("No instincts index yet."); process.exit(0); }
+      const index = JSON.parse(raw);
+      const pending = (index.instincts || []).filter(i =>
+        i && i.level === "draft" && (i.origin || "").startsWith("plexus:"));
+      if (!pending.length) { console.log("No pending team imports — quarantine is empty."); process.exit(0); }
+      console.log("PENDING TEAM IMPORTS (draft — not injected until validated)\n");
+      for (const i of pending) {
+        const src = i.origin.slice(7); // strip "plexus:"
+        console.log("  " + i.id + "  [" + (i.domain || "general") + "]  from " + src +
+          "  · " + (i.occurrences || 0) + "/5 matches toward auto-promote");
+        console.log("    -> " + String(i.inject || "").slice(0, 90));
+      }
+      console.log("\nValidate with your own usage (5 matches auto-promote), or decide now:");
+      console.log("  /promote  — trust it explicitly     /downvote — reject it (never resurrects)");
+    ' "$INDEX"
+    ;;
+
+  # ── directives: PM guidelines live in the data plane, never as instincts ────
+  directive)
+    SUB="${1:-}"; [ $# -gt 0 ] && shift
+    # parse: positional id (add/supersede) + --text/--scope/--team/--all flags
+    DID=""; DTEXT=""; DSCOPE="global"; DTEAM=""; DALL=0
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --text)  DTEXT="${2:-}"; shift 2 ;;
+        --scope) DSCOPE="${2:-global}"; shift 2 ;;
+        --team)  DTEAM="${2:-}"; shift 2 ;;
+        --all)   DALL=1; shift ;;
+        *)       [ -z "$DID" ] && DID="$1"; shift ;;
+      esac
+    done
+    if [ -n "$DTEAM" ]; then validate_name "$DTEAM"; else resolve_single_team; DTEAM="$RESOLVED"; fi
+    CLONE="$PLEXUS_DIR/$DTEAM"
+    [ -d "$CLONE" ] || die "no team '$DTEAM' — run /plexus join first"
+
+    case "$SUB" in
+      add)
+        [ -z "$DID" ] || [ -z "$DTEXT" ] && die "usage: _plexus-sync.sh directive add <id> --text \"...\" [--scope <slug>] [--team <name>]"
+        case "$DID" in *..*|*/*|*\\*|.*) die "invalid directive id '$DID'" ;; esac
+        echo "$DID" | grep -qE '^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$' || die "invalid directive id '$DID'"
+        resolve_author
+        git -C "$CLONE" pull --rebase -q 2>/dev/null
+        node -e '
+          const fs = require("fs"), path = require("path");
+          const [clone, id, text, scope, author] = process.argv.slice(1);
+          function scrub(v) {
+            let s = String(v);
+            s = s.replace(/(api[_-]?key|token|secret|password|authorization|credentials?|auth)(["'"'"'\s:=]+)([A-Za-z]+\s+)?([A-Za-z0-9_\-/.+=]{8,})/gi,
+              (m, a, b, c) => a + b + (c || "") + "[REDACTED]");
+            s = s.replace(/eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g, "[JWT_REDACTED]");
+            s = s.replace(/gh[ps]_[A-Za-z0-9]{36,}/g, "[GITHUB_TOKEN_REDACTED]");
+            s = s.replace(/AKIA[A-Z0-9]{16}/g, "[AWS_KEY_REDACTED]");
+            s = s.replace(/-----BEGIN [A-Z ]+-----[\s\S]*?-----END [A-Z ]+-----/g, "[PEM_REDACTED]");
+            s = s.replace(/(?:sk_live|sk_test|rk_live|rk_test)_[A-Za-z0-9]{20,}/g, "[STRIPE_KEY_REDACTED]");
+            s = s.replace(/xox[bpras]-[A-Za-z0-9\-]{10,}/g, "[SLACK_TOKEN_REDACTED]");
+            s = s.replace(/SG\.[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-]{20,}/g, "[SENDGRID_KEY_REDACTED]");
+            return s;
+          }
+          const dir = path.join(clone, "directives");
+          fs.mkdirSync(dir, { recursive: true });
+          const f = path.join(dir, id + ".md");
+          let version = 1, created = new Date().toISOString();
+          if (fs.existsSync(f)) {
+            const old = fs.readFileSync(f, "utf8");
+            const v = old.match(/^version: (\d+)$/m); if (v) version = Number(v[1]) + 1;
+            const c = old.match(/^created: (.+)$/m); if (c) created = c[1];
+          }
+          fs.writeFileSync(f, [
+            "---",
+            "id: " + id,
+            "scope: " + scope,
+            "status: active",
+            "author: " + author,
+            "created: " + created,
+            "version: " + version,
+            "---",
+            "",
+            scrub(text).slice(0, 2000),
+            ""
+          ].join("\n"));
+          console.log("directive \"" + id + "\" v" + version + " (scope: " + scope + ") set by " + author);
+        ' "$CLONE" "$DID" "$DTEXT" "$DSCOPE" "$AUTHOR" || die "directive write failed"
+        append_activity "$CLONE" "$AUTHOR" directive_add "$DID" 1
+        git -C "$CLONE" add -A >/dev/null 2>&1
+        git -C "$CLONE" commit -qm "docs(team): directive $DID" >/dev/null 2>&1
+        push_with_retry "$CLONE" || die "push failed — check remote access"
+        ;;
+      list)
+        node -e '
+          const fs = require("fs"), path = require("path");
+          const [clone, team, showAll] = process.argv.slice(1);
+          const dir = path.join(clone, "directives");
+          let files = [];
+          try { files = fs.readdirSync(dir).filter(f => f.endsWith(".md")); } catch (e) {}
+          const rows = [];
+          for (const f of files) {
+            try {
+              const txt = fs.readFileSync(path.join(dir, f), "utf8");
+              const fm = {};
+              const m = txt.match(/^---\n([\s\S]*?)\n---/);
+              if (m) for (const ln of m[1].split("\n")) {
+                const kv = ln.match(/^(\w+): (.*)$/); if (kv) fm[kv[1]] = kv[2];
+              }
+              const body = txt.replace(/^---\n[\s\S]*?\n---\n*/, "").trim().split("\n")[0] || "";
+              if (fm.status !== "active" && showAll !== "1") continue;
+              rows.push("  " + (fm.id || f) + "  [" + (fm.scope || "global") + "]" +
+                (fm.status !== "active" ? " (" + fm.status + ")" : "") +
+                "  by " + (fm.author || "?") + " v" + (fm.version || 1) + "\n    -> " + body.slice(0, 100));
+            } catch (e) {}
+          }
+          if (!rows.length) { console.log("[" + team + "] no " + (showAll === "1" ? "" : "active ") + "directives."); process.exit(0); }
+          console.log("[" + team + "] directives:\n" + rows.join("\n"));
+        ' "$CLONE" "$DTEAM" "$DALL"
+        ;;
+      supersede)
+        [ -z "$DID" ] && die "usage: _plexus-sync.sh directive supersede <id> [--team <name>]"
+        resolve_author
+        git -C "$CLONE" pull --rebase -q 2>/dev/null
+        F="$CLONE/directives/$DID.md"
+        [ -f "$F" ] || die "no directive '$DID' in team '$DTEAM'"
+        node -e '
+          const fs = require("fs");
+          const f = process.argv[1];
+          let txt = fs.readFileSync(f, "utf8");
+          txt = txt.replace(/^status: active$/m, "status: superseded");
+          txt = txt.replace(/^version: (\d+)$/m, (m, v) => "version: " + (Number(v) + 1));
+          fs.writeFileSync(f, txt);
+          console.log("directive superseded");
+        ' "$F" || die "supersede failed"
+        append_activity "$CLONE" "$AUTHOR" directive_supersede "$DID" 1
+        git -C "$CLONE" add -A >/dev/null 2>&1
+        git -C "$CLONE" commit -qm "docs(team): supersede directive $DID" >/dev/null 2>&1
+        push_with_retry "$CLONE" || die "push failed — check remote access"
+        ;;
+      *) die "usage: _plexus-sync.sh directive add|list|supersede ..." ;;
+    esac
+    ;;
+
+  # ── log: traceability timeline (metadata ledger + git history) ──────────────
+  log)
+    LNAME=""; LMEMBER=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --member) LMEMBER="${2:-}"; shift 2 ;;
+        *)        [ -z "$LNAME" ] && LNAME="$1"; shift ;;
+      esac
+    done
+    if [ -n "$LNAME" ]; then validate_name "$LNAME"; else resolve_single_team; LNAME="$RESOLVED"; fi
+    CLONE="$PLEXUS_DIR/$LNAME"
+    [ -d "$CLONE" ] || die "no team '$LNAME'"
+    node -e '
+      const fs = require("fs"), path = require("path");
+      const [clone, team, member] = process.argv.slice(1);
+      const dir = path.join(clone, "activity");
+      let entries = [];
+      try {
+        for (const f of fs.readdirSync(dir).filter(f => f.endsWith(".ndjson"))) {
+          for (const ln of fs.readFileSync(path.join(dir, f), "utf8").split("\n")) {
+            if (!ln.trim()) continue;
+            try { entries.push(JSON.parse(ln)); } catch (e) {}
+          }
+        }
+      } catch (e) {}
+      if (member) entries = entries.filter(e => e.author === member);
+      entries.sort((a, b) => String(b.ts).localeCompare(String(a.ts)));
+      if (!entries.length) { console.log("[" + team + "] no activity yet."); process.exit(0); }
+      console.log("[" + team + "] activity (latest " + Math.min(entries.length, 20) + " of " + entries.length + "):");
+      for (const e of entries.slice(0, 20)) {
+        console.log("  " + e.ts + "  " + e.author + "  " + e.action + "  " + e.id + " (rev " + (e.rev || 1) + ")");
+      }
+    ' "$CLONE" "$LNAME" "$LMEMBER"
+    ;;
+
   # ── pull ────────────────────────────────────────────────────────────────────
   pull)
     ONLY="${1:-}"
-    [ -d "$TEAMS_DIR" ] || { echo "No teams yet. /team join <name> <git-url> to start."; exit 0; }
+    [ -d "$PLEXUS_DIR" ] || { echo "No teams yet. /plexus join <name> <git-url> to start."; exit 0; }
     # The dream cycle owns the index while it runs — do not race it.
     [ -f "$SKILLS/_dream.lock" ] && die "dream cycle is running — retry in a minute"
 
     FOUND=0
-    for CLONE in "$TEAMS_DIR"/*/; do
+    for CLONE in "$PLEXUS_DIR"/*/; do
       [ -f "$CLONE/instincts.json" ] || continue
       NAME="$(basename "$CLONE")"
       [ -n "$ONLY" ] && [ "$NAME" != "$ONLY" ] && continue
@@ -199,7 +419,7 @@ case "$CMD" in
         try { shared = readJson(path.join(clone, "instincts.json")).instincts || []; } catch (e) {}
         let policyLevel = "draft";
         try {
-          const cfg = readJson(path.join(clone, "sinapsis-team.json"));
+          const cfg = readJson(path.join(clone, "sinapsis-plexus.json"));
           if (cfg.policy && cfg.policy.import_level === "confirmed") policyLevel = "confirmed";
           // anything else (including "permanent") stays draft — permanent is earned, never imported
         } catch (e) {}
@@ -212,7 +432,7 @@ case "$CMD" in
 
         const ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
         const REDOS = /(\+|\*|\{)\)?(\+|\*|\{)/;   // same nested-quantifier guard as _passive-activator.sh
-        const originPrefix = "team:" + teamName + "/";
+        const originPrefix = "plexus:" + teamName + "/";
         let added = 0, updated = 0, skipped = 0;
 
         for (const s of shared) {
@@ -259,15 +479,15 @@ case "$CMD" in
         fs.renameSync(ltmp, ledgerFile);
         console.log("[" + teamName + "] " + added + " imported, " + updated + " updated, " + skipped + " skipped" +
           (added || updated ? " — new imports are drafts: they activate after YOUR usage validates them (or /promote)" : ""));
-      ' "$CLONE" "$NAME" "$INDEX" "$TEAMS_DIR/$NAME.imported.json" || echo "WARN: import failed for '$NAME'"
+      ' "$CLONE" "$NAME" "$INDEX" "$PLEXUS_DIR/$NAME.imported.json" || echo "WARN: import failed for '$NAME'"
     done
-    [ "$FOUND" = "0" ] && echo "No matching team clones under $TEAMS_DIR."
+    [ "$FOUND" = "0" ] && echo "No matching team clones under $PLEXUS_DIR."
     ;;
 
   # ── context ─────────────────────────────────────────────────────────────────
   context)
     SUB="${1:-}"; NAME="${2:-}"
-    [ -z "$SUB" ] && die "usage: _team-sync.sh context push|show <name>"
+    [ -z "$SUB" ] && die "usage: _plexus-sync.sh context push|show <name>"
 
     # Key the context by the project's git remote — the cross-machine-stable id
     # (same derivation as observe_v3.py: sha256(remote || root)[:12]).
@@ -280,10 +500,10 @@ case "$CMD" in
 
     case "$SUB" in
       push)
-        [ -z "$NAME" ] && die "usage: _team-sync.sh context push <name>"
+        [ -z "$NAME" ] && die "usage: _plexus-sync.sh context push <name>"
         validate_name "$NAME"
-        CLONE="$TEAMS_DIR/$NAME"
-        [ -d "$CLONE" ] || die "no team '$NAME' — run /team join first"
+        CLONE="$PLEXUS_DIR/$NAME"
+        [ -d "$CLONE" ] || die "no team '$NAME' — run /plexus join first"
         SRC="$HOME/.claude/homunculus/projects/$PROJECT_ID/context.md"
         [ -f "$SRC" ] || die "no context.md for this project yet (Sinapsis writes it as you work)"
         git -C "$CLONE" pull --rebase -q 2>/dev/null
@@ -313,7 +533,7 @@ case "$CMD" in
         ;;
       show)
         SHOWN=0
-        for CLONE in "$TEAMS_DIR"/*/; do
+        for CLONE in "$PLEXUS_DIR"/*/; do
           [ -d "$CLONE" ] || continue
           [ -n "$NAME" ] && [ "$(basename "$CLONE")" != "$NAME" ] && continue
           F="$CLONE/context/$SLUG.md"
@@ -323,17 +543,17 @@ case "$CMD" in
             SHOWN=1
           fi
         done
-        [ "$SHOWN" = "0" ] && echo "No team context for this project. A teammate can publish it: /team context push <name>"
+        [ "$SHOWN" = "0" ] && echo "No team context for this project. A teammate can publish it: /plexus context push <name>"
         ;;
-      *) die "usage: _team-sync.sh context push|show <name>" ;;
+      *) die "usage: _plexus-sync.sh context push|show <name>" ;;
     esac
     ;;
 
   # ── status ──────────────────────────────────────────────────────────────────
   status)
-    [ -d "$TEAMS_DIR" ] || { echo "No teams. /team init <name> <git-url> to create one."; exit 0; }
+    [ -d "$PLEXUS_DIR" ] || { echo "No teams. /plexus init <name> <git-url> to create one."; exit 0; }
     FOUND=0
-    for CLONE in "$TEAMS_DIR"/*/; do
+    for CLONE in "$PLEXUS_DIR"/*/; do
       [ -f "$CLONE/instincts.json" ] || continue
       FOUND=1
       NAME="$(basename "$CLONE")"
@@ -350,21 +570,21 @@ case "$CMD" in
         let led = {};   try { led = readJson(ledgerFile).imported || {}; } catch (e) {}
         const pending = shared.filter(s => s && s.id && (s.revision || 1) > (led[s.id] || 0)).length;
         console.log("  " + name + ": " + shared.length + " shared, " +
-          Object.keys(led).length + " imported, " + pending + " pending (/team pull), last commit " + last);
-      ' "$CLONE" "$NAME" "$TEAMS_DIR/$NAME.imported.json" "$LAST"
+          Object.keys(led).length + " imported, " + pending + " pending (/plexus pull), last commit " + last);
+      ' "$CLONE" "$NAME" "$PLEXUS_DIR/$NAME.imported.json" "$LAST"
     done
-    [ "$FOUND" = "0" ] && echo "No teams. /team init <name> <git-url> to create one."
+    [ "$FOUND" = "0" ] && echo "No teams. /plexus init <name> <git-url> to create one."
     ;;
 
   # ── leave ───────────────────────────────────────────────────────────────────
   leave)
     NAME="${1:-}"; PURGE="${2:-}"
-    [ -z "$NAME" ] && die "usage: _team-sync.sh leave <name> [--purge]"
+    [ -z "$NAME" ] && die "usage: _plexus-sync.sh leave <name> [--purge]"
     validate_name "$NAME"
-    CLONE="$TEAMS_DIR/$NAME"
+    CLONE="$PLEXUS_DIR/$NAME"
     [ -d "$CLONE" ] || die "no team '$NAME'"
     rm -rf "$CLONE"
-    rm -f "$TEAMS_DIR/$NAME.imported.json"
+    rm -f "$PLEXUS_DIR/$NAME.imported.json"
     echo "Left team '$NAME' (clone + import ledger removed)."
     if [ "$PURGE" = "--purge" ]; then
       [ -f "$SKILLS/_dream.lock" ] && die "dream cycle is running — retry the purge in a minute"
@@ -380,21 +600,26 @@ case "$CMD" in
         fs.writeFileSync(tmp, JSON.stringify(index, null, 2));
         fs.renameSync(tmp, indexFile);
         console.log("Purged " + (before - index.instincts.length) + " instincts from team " + prefix.slice(5, -1) + ".");
-      ' "$INDEX" "team:$NAME/" 2>/dev/null || echo "WARN: purge skipped (no readable index)"
+      ' "$INDEX" "plexus:$NAME/" 2>/dev/null || echo "WARN: purge skipped (no readable index)"
     fi
     ;;
 
   *)
     cat <<'USAGE'
-Sinapsis Teams — share what your team has learned (docs/TEAMS.md)
+Sinapsis Plexus — wire your team's synapses into one nervous system (docs/PLEXUS.md)
 
-  _team-sync.sh init  <name> <git-url>      create a team
-  _team-sync.sh join  <name> <git-url>      join an existing team
-  _team-sync.sh pull  [name]                import new/updated team knowledge
-  _team-sync.sh share <name> <instinct-id>  publish a confirmed/permanent instinct
-  _team-sync.sh context push|show <name>    share/read per-project agent context
-  _team-sync.sh status                      teams, counts, last sync
-  _team-sync.sh leave <name> [--purge]      remove team (--purge: also its instincts)
+  _plexus-sync.sh init  <name> <git-url>      create a team
+  _plexus-sync.sh join  <name> <git-url>      join an existing team
+  _plexus-sync.sh pull  [name]                import new/updated team knowledge
+  _plexus-sync.sh share <name> <instinct-id>  publish a confirmed/permanent instinct
+  _plexus-sync.sh review                      pending team imports awaiting your validation
+  _plexus-sync.sh directive add <id> --text "..." [--scope <slug>] [--team <name>]
+  _plexus-sync.sh directive list [--all] [--team <name>]
+  _plexus-sync.sh directive supersede <id> [--team <name>]
+  _plexus-sync.sh log [name] [--member <a>]   traceability timeline (metadata only)
+  _plexus-sync.sh context push|show <name>    share/read per-project agent context
+  _plexus-sync.sh status                      teams, counts, last sync
+  _plexus-sync.sh leave <name> [--purge]      remove team (--purge: also its instincts)
 USAGE
     exit 1
     ;;

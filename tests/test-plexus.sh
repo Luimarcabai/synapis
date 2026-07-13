@@ -1,17 +1,19 @@
 #!/bin/bash
-# test-team.sh — Sinapsis Teams (v4.7.0) TDD suite
+# test-plexus.sh — Sinapsis Plexus (v4.7.0) TDD suite
 #   Hermetic: a local bare git repo plays the team remote, HOME points at a sandbox.
 #   Covers: init/join, share (validation gate, scrubbing, attribution), pull
 #   (draft quarantine, permanent cap, personal-wins collision, idempotency,
-#   no-resurrection, revision re-quarantine, hostile-payload rejection), leave.
-# Run: bash tests/test-team.sh
+#   no-resurrection, revision re-quarantine, hostile-payload rejection),
+#   directives (PM guidelines), traceability (metadata-only activity ledger),
+#   review, schema versioning, leave.
+# Run: bash tests/test-plexus.sh
 
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-TEAMSYNC="$SCRIPT_DIR/core/_team-sync.sh"
+TEAMSYNC="$SCRIPT_DIR/core/_plexus-sync.sh"
 
 PASS=0
 FAIL=0
-TOTAL=18
+TOTAL=28
 
 pass() { PASS=$((PASS + 1)); echo "  PASS: $1"; }
 fail() { FAIL=$((FAIL + 1)); echo "  FAIL: $1"; }
@@ -46,7 +48,7 @@ team() { local h="$1"; shift; HOME="$h" bash "$TEAMSYNC" "$@"; }
 NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 echo ""
-echo "=== Sinapsis Teams tests ==="
+echo "=== Sinapsis Plexus tests ==="
 echo ""
 
 # ── Section 1: init / join ──
@@ -54,15 +56,15 @@ echo "[Section 1] init / join"
 setup_world
 
 team "$HOME_A" init demo "$REMOTE" >/dev/null 2>&1
-if [ -f "$HOME_A/.claude/skills/_team/demo/sinapsis-team.json" ] && \
-   [ -f "$HOME_A/.claude/skills/_team/demo/instincts.json" ]; then
+if [ -f "$HOME_A/.claude/skills/_plexus/demo/sinapsis-plexus.json" ] && \
+   [ -f "$HOME_A/.claude/skills/_plexus/demo/instincts.json" ]; then
   pass "T1: init bootstraps team repo structure"
 else
-  fail "T1: init must create sinapsis-team.json + instincts.json in the clone"
+  fail "T1: init must create sinapsis-plexus.json + instincts.json in the clone"
 fi
 
 team "$HOME_B" join demo "$REMOTE" >/dev/null 2>&1
-if [ -f "$HOME_B/.claude/skills/_team/demo/instincts.json" ]; then
+if [ -f "$HOME_B/.claude/skills/_plexus/demo/instincts.json" ]; then
   pass "T2: join clones an existing team"
 else
   fail "T2: join must clone the team repo"
@@ -88,7 +90,7 @@ write_index "$HOME_A" "{
 }"
 
 team "$HOME_A" share demo conv-commits >/dev/null 2>&1
-SHARED=$(cat "$HOME_A/.claude/skills/_team/demo/instincts.json" 2>/dev/null)
+SHARED=$(cat "$HOME_A/.claude/skills/_plexus/demo/instincts.json" 2>/dev/null)
 
 N=$(echo "$SHARED" | jfield "r.instincts.length" 2>/dev/null)
 [ "$N" = "1" ] && pass "T4: share publishes the instinct to the team repo" \
@@ -140,8 +142,8 @@ LEVEL=$(echo "$BIDX" | jfield "((r.instincts.find(i=>i.id==='conv-commits'))||{}
 
 ORIGIN=$(echo "$BIDX" | jfield "((r.instincts.find(i=>i.id==='conv-commits'))||{}).origin||''")
 case "$ORIGIN" in
-  team:demo/*) pass "T10: pulled instinct carries origin team:demo/<author>" ;;
-  *) fail "T10: expected origin team:demo/<author>, got '$ORIGIN'" ;;
+  plexus:demo/*) pass "T10: pulled instinct carries origin plexus:demo/<author>" ;;
+  *) fail "T10: expected origin plexus:demo/<author>, got '$ORIGIN'" ;;
 esac
 
 # pull is idempotent — re-pull must not duplicate or reset
@@ -169,7 +171,7 @@ write_index "$HOME_B" "{
   ],
   \"archived\": []
 }"
-rm -f "$HOME_B/.claude/skills/_team/demo.imported.json"
+rm -f "$HOME_B/.claude/skills/_plexus/demo.imported.json"
 team "$HOME_B" pull demo >/dev/null 2>&1
 MINE=$(read_index "$HOME_B" | jfield "(r.instincts.find(i=>i.id==='conv-commits')||{}).inject||''")
 case "$MINE" in
@@ -184,10 +186,10 @@ const r=JSON.parse(fs.readFileSync(f,"utf8"));
 r.instincts.push({id:"evil-perm",domain:"general",trigger_pattern:"Edit",
   inject:"perm attempt",author:"mallory",shared_at:"2026-01-01T00:00:00Z",
   shared_level:"permanent",revision:1});
-fs.writeFileSync(f,JSON.stringify(r,null,2));' "$HOME_A/.claude/skills/_team/demo/instincts.json"
-git -C "$HOME_A/.claude/skills/_team/demo" add -A >/dev/null 2>&1
-git -C "$HOME_A/.claude/skills/_team/demo" commit -qm "perm attempt" >/dev/null 2>&1
-git -C "$HOME_A/.claude/skills/_team/demo" push -q >/dev/null 2>&1
+fs.writeFileSync(f,JSON.stringify(r,null,2));' "$HOME_A/.claude/skills/_plexus/demo/instincts.json"
+git -C "$HOME_A/.claude/skills/_plexus/demo" add -A >/dev/null 2>&1
+git -C "$HOME_A/.claude/skills/_plexus/demo" commit -qm "perm attempt" >/dev/null 2>&1
+git -C "$HOME_A/.claude/skills/_plexus/demo" push -q >/dev/null 2>&1
 team "$HOME_B" pull demo >/dev/null 2>&1
 PLEVEL=$(read_index "$HOME_B" | jfield "(r.instincts.find(i=>i.id==='evil-perm')||{}).level||'MISSING'")
 [ "$PLEVEL" = "draft" ] && pass "T14: shared_level=permanent still imports as draft (cap)" \
@@ -201,10 +203,10 @@ r.instincts.push({id:"redos",domain:"general",trigger_pattern:"(a+)+b",
   inject:"redos",author:"mallory",shared_at:"2026-01-01T00:00:00Z",revision:1});
 r.instincts.push({id:"../../etc/passwd",domain:"general",trigger_pattern:"Edit",
   inject:"traversal",author:"mallory",shared_at:"2026-01-01T00:00:00Z",revision:1});
-fs.writeFileSync(f,JSON.stringify(r,null,2));' "$HOME_A/.claude/skills/_team/demo/instincts.json"
-git -C "$HOME_A/.claude/skills/_team/demo" add -A >/dev/null 2>&1
-git -C "$HOME_A/.claude/skills/_team/demo" commit -qm "hostile" >/dev/null 2>&1
-git -C "$HOME_A/.claude/skills/_team/demo" push -q >/dev/null 2>&1
+fs.writeFileSync(f,JSON.stringify(r,null,2));' "$HOME_A/.claude/skills/_plexus/demo/instincts.json"
+git -C "$HOME_A/.claude/skills/_plexus/demo" add -A >/dev/null 2>&1
+git -C "$HOME_A/.claude/skills/_plexus/demo" commit -qm "hostile" >/dev/null 2>&1
+git -C "$HOME_A/.claude/skills/_plexus/demo" push -q >/dev/null 2>&1
 team "$HOME_B" pull demo >/dev/null 2>&1
 BAD=$(read_index "$HOME_B" | jfield "r.instincts.filter(i=>i.id==='redos'||i.id.includes('..')).length")
 [ "$BAD" = "0" ] && pass "T15: ReDoS trigger and path-traversal id are rejected on pull" \
@@ -214,7 +216,7 @@ BAD=$(read_index "$HOME_B" | jfield "r.instincts.filter(i=>i.id==='redos'||i.id.
 write_index "$HOME_B" "{
   \"version\": \"4.1\",
   \"instincts\": [
-    {\"id\":\"evil-perm\",\"domain\":\"general\",\"level\":\"confirmed\",\"trigger_pattern\":\"Edit\",\"inject\":\"perm attempt\",\"origin\":\"team:demo/mallory\",\"team_rev\":1,\"occurrences\":9}
+    {\"id\":\"evil-perm\",\"domain\":\"general\",\"level\":\"confirmed\",\"trigger_pattern\":\"Edit\",\"inject\":\"perm attempt\",\"origin\":\"plexus:demo/mallory\",\"team_rev\":1,\"occurrences\":9}
   ],
   \"archived\": []
 }"
@@ -223,10 +225,10 @@ const fs=require("fs");const f=process.argv[1];
 const r=JSON.parse(fs.readFileSync(f,"utf8"));
 const i=r.instincts.find(x=>x.id==="evil-perm");
 i.inject="REVISED text"; i.revision=2;
-fs.writeFileSync(f,JSON.stringify(r,null,2));' "$HOME_A/.claude/skills/_team/demo/instincts.json"
-git -C "$HOME_A/.claude/skills/_team/demo" add -A >/dev/null 2>&1
-git -C "$HOME_A/.claude/skills/_team/demo" commit -qm "revise" >/dev/null 2>&1
-git -C "$HOME_A/.claude/skills/_team/demo" push -q >/dev/null 2>&1
+fs.writeFileSync(f,JSON.stringify(r,null,2));' "$HOME_A/.claude/skills/_plexus/demo/instincts.json"
+git -C "$HOME_A/.claude/skills/_plexus/demo" add -A >/dev/null 2>&1
+git -C "$HOME_A/.claude/skills/_plexus/demo" commit -qm "revise" >/dev/null 2>&1
+git -C "$HOME_A/.claude/skills/_plexus/demo" push -q >/dev/null 2>&1
 team "$HOME_B" pull demo >/dev/null 2>&1
 RIDX=$(read_index "$HOME_B")
 RLEVEL=$(echo "$RIDX" | jfield "(r.instincts.find(i=>i.id==='evil-perm')||{}).level||'MISSING'")
@@ -237,19 +239,101 @@ else
   fail "T16: expected draft + 'REVISED text', got '$RLEVEL' + '$RTEXT'"
 fi
 
-# ── Section 4: leave ──
-echo "[Section 4] leave"
+# ── Section 4: directives (PM guidelines live in the data plane, never as instincts) ──
+echo "[Section 4] directives"
 
-team "$HOME_B" leave demo --purge >/dev/null 2>&1
-if [ ! -d "$HOME_B/.claude/skills/_team/demo" ]; then
-  pass "T17: leave removes the clone"
+team "$HOME_A" directive add scope-mvp --text "MVP first: no feature outside the January scope doc" >/dev/null 2>&1
+if [ -f "$HOME_A/.claude/skills/_plexus/demo/directives/scope-mvp.md" ] && \
+   grep -q "status: active" "$HOME_A/.claude/skills/_plexus/demo/directives/scope-mvp.md"; then
+  pass "T17: directive add creates directives/<id>.md with active status"
 else
-  fail "T17: clone still present after leave"
+  fail "T17: directive file missing or without active status"
 fi
 
-LEFT=$(read_index "$HOME_B" | jfield "r.instincts.filter(i=>(i.origin||'').startsWith('team:demo/')).length")
-[ "$LEFT" = "0" ] && pass "T18: leave --purge strips that team's instincts from the index" \
-  || fail "T18: $LEFT team instincts survived purge"
+if git -C "$REMOTE" log --oneline 2>/dev/null | grep -q "scope-mvp"; then
+  pass "T18: directive add commits and pushes to the remote"
+else
+  fail "T18: directive commit not on the remote"
+fi
+
+# invalid directive id rejected (path safety)
+if team "$HOME_A" directive add "../evil" --text "x" >/dev/null 2>&1; then
+  fail "T19: directive add accepted a path-traversal id"
+else
+  pass "T19: directive add rejects path-traversal ids"
+fi
+
+LISTED=$(team "$HOME_A" directive list 2>/dev/null)
+echo "$LISTED" | grep -q "scope-mvp" && pass "T20: directive list shows the active directive" \
+  || fail "T20: directive list missing scope-mvp. OUT='$LISTED'"
+
+team "$HOME_A" directive supersede scope-mvp >/dev/null 2>&1
+LISTED2=$(team "$HOME_A" directive list 2>/dev/null)
+if echo "$LISTED2" | grep -q "scope-mvp"; then
+  fail "T21: superseded directive still listed as active"
+else
+  pass "T21: directive supersede hides it from the active list"
+fi
+
+# directives are context, never instincts: pull must not import them into the index
+team "$HOME_B" pull demo >/dev/null 2>&1
+DIRAS=$(read_index "$HOME_B" | jfield "r.instincts.filter(i=>i.id==='scope-mvp').length")
+[ "$DIRAS" = "0" ] && pass "T22: directives never imported as instincts" \
+  || fail "T22: directive leaked into the instincts index"
+
+# ── Section 5: traceability (metadata-only activity ledger) + review + schema ──
+echo "[Section 5] traceability / review / schema"
+
+if grep -q '"schema_version"' "$HOME_A/.claude/skills/_plexus/demo/sinapsis-plexus.json"; then
+  pass "T23: init stamps schema_version in the team config"
+else
+  fail "T23: schema_version missing from sinapsis-plexus.json"
+fi
+
+ACT=$(ls "$HOME_A/.claude/skills/_plexus/demo/activity/" 2>/dev/null | grep ndjson | head -1)
+if [ -n "$ACT" ] && grep -q '"action"' "$HOME_A/.claude/skills/_plexus/demo/activity/$ACT"; then
+  pass "T24: share/directive append metadata lines to activity/<author>.ndjson"
+else
+  fail "T24: no activity ledger written"
+fi
+
+# the ledger must be metadata-only: no inject text, no session content
+if grep -qi "conventional commits\|MVP first" "$HOME_A/.claude/skills/_plexus/demo/activity/$ACT" 2>/dev/null; then
+  fail "T25: activity ledger contains knowledge text (must be metadata only)"
+else
+  pass "T25: activity ledger is metadata-only (no knowledge text)"
+fi
+
+LOGOUT=$(team "$HOME_A" log demo 2>/dev/null)
+echo "$LOGOUT" | grep -q "conv-commits" && pass "T26: log renders the activity timeline" \
+  || fail "T26: log output missing shared instinct. OUT='$LOGOUT'"
+
+# review lists pending imported drafts (and only team-origin ones)
+write_index "$HOME_B" "{
+  \"version\": \"4.1\",
+  \"instincts\": [
+    {\"id\":\"from-team\",\"domain\":\"git\",\"level\":\"draft\",\"trigger_pattern\":\"Edit\",\"inject\":\"pending rule\",\"origin\":\"plexus:demo/alice\",\"team_rev\":1,\"occurrences\":2},
+    {\"id\":\"my-own-draft\",\"domain\":\"git\",\"level\":\"draft\",\"trigger_pattern\":\"Edit\",\"inject\":\"own draft\",\"origin\":\"session-learner\",\"occurrences\":1}
+  ],
+  \"archived\": []
+}"
+REVOUT=$(team "$HOME_B" review 2>/dev/null)
+if echo "$REVOUT" | grep -q "from-team" && ! echo "$REVOUT" | grep -q "my-own-draft"; then
+  pass "T27: review lists pending team imports (and only those)"
+else
+  fail "T27: review output wrong. OUT='$REVOUT'"
+fi
+
+# ── Section 6: leave ──
+echo "[Section 6] leave"
+
+team "$HOME_B" leave demo --purge >/dev/null 2>&1
+LEFT=$(read_index "$HOME_B" | jfield "r.instincts.filter(i=>(i.origin||'').startsWith('plexus:demo/')).length")
+if [ ! -d "$HOME_B/.claude/skills/_plexus/demo" ] && [ "$LEFT" = "0" ]; then
+  pass "T28: leave --purge removes clone and that team's instincts"
+else
+  fail "T28: leave incomplete (clone or $LEFT instincts left)"
+fi
 
 teardown_world
 
