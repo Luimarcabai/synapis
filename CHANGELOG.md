@@ -1,5 +1,21 @@
 # Changelog
 
+## v4.8.1 (2026-07-17)
+
+### Fixed
+
+- **Installers now wire hooks into an EXISTING `settings.json`** (external audit — iAmasters OS, finding #1): both installers used to print "merge hooks manually" and register nothing when the file already existed — which it almost always does — leaving a ghost install: files on disk, learning pipeline inert, no warning anywhere. New `core/_merge-hooks.js` (shared by install.sh and install.bat) creates the file when missing and otherwise deep-merges: only Sinapsis hooks whose `command` is not yet registered for that event are appended (dedup by trimmed command string), every existing entry — custom hooks, custom events, other plugins — is preserved untouched, a UTF-8 BOM is stripped (#16 family), a timestamped backup is written next to the file before modifying, and the write is atomic. A malformed `settings.json` aborts the merge with a warning and is left untouched; the install still completes.
+- **Legacy cleanup archives instead of deleting** (finding #2): Step 5b did `rm -rf` over a hardcoded name list that can include a LIVE user directory (e.g. a still-active `synapis-learning` install). Legacy entries are now moved to `skills/_archived/legacy-<timestamp>/`.
+- **`install.bat` actually installs skill subdirectories** (finding #3): the skill copy loop used `xcopy` without `/E`, so `hooks/observe.sh` + `observe_v3.py` never reached disk on Windows — the observer recorded nothing even with hooks correctly wired. Also fixed: stale `%errorlevel%` reads inside parenthesised blocks (the `python` fallback always reported "Python 3 not found" on machines with `python` but no `python3`; the settings success message could report stale status) now use `!errorlevel!`, and the backup timestamp no longer depends on `wmic` (deprecated, removed in Windows 11 24H2+) — it uses PowerShell `Get-Date`.
+
+### Changed
+
+- Version-consistency pass (finding #5): README title updated to v4.8; banners no longer pinned to stale versions ("v4.4 hooks" / "v4.5 hooks"); `/clone` no longer advertised by either installer (Step 5b archives it as legacy); `docs/quickstart.md` cleaned of the `synapis-*` era (skills listing, `/clone` section, `[SYNAPIS]` labels, uninstall paths).
+
+### Tests
+
+- New `tests/test-installer-hardening.sh` — 17 tests: `_merge-hooks.js` unit (create from template, merge into hook-less file, custom hooks/events preserved, idempotency, partial-wiring dedup, BOM strip, malformed file untouched), install.sh end-to-end over a pre-existing `settings.json` (wires all 7 hooks, double-install dedup, malformed file survives), legacy archiving (content intact under `_archived/legacy-*`), static installer asserts (xcopy `/E`, no `wmic`, `!errorlevel!` in block reads) and a version-consistency gate between CHANGELOG, installers and README. Registered in CI.
+
 ## v4.8.0 (2026-07-13)
 
 ### Changed — Sinapsis Plexus extracted to the private team edition

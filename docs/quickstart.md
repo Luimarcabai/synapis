@@ -13,17 +13,15 @@ Despues de ejecutar `install.sh` o `install.bat`, tienes esto en tu ordenador:
   CLAUDE.md                ← Tu "carta de presentacion" para Claude
   skills/
     skill-router/          ← El cerebro que decide que skills cargar
-    synapis-learning/      ← El motor que aprende de ti (en segundo plano)
-    synapis-instincts/     ← La base de datos de lo que ha aprendido
-    synapis-researcher/    ← Investigacion profunda con multiples fuentes
-    synapis-optimizer/     ← Controla que no gastes tokens de mas
+    sinapsis-learning/     ← El motor que aprende de ti (en segundo plano)
+    sinapsis-instincts/    ← La base de datos de lo que ha aprendido
     _library/              ← Skills dormidas (se activan cuando las necesitas)
     _archived/             ← Skills retiradas (recuperables)
     _catalog.json          ← Registro de todas las skills disponibles
     _passive-rules.json    ← Reglas que se aplican solas (seguridad, calidad)
     _operator-state.json   ← TU identidad, decisiones, memoria entre proyectos
     _sinapsis-projects.json         ← Registro de tus proyectos
-  commands/                ← Comandos que puedes ejecutar (/evolve, /clone, etc.)
+  commands/                ← Comandos que puedes ejecutar (/evolve, /dream, etc.)
 ```
 
 **No necesitas tocar ninguno de estos archivos manualmente.** Claude los gestiona por ti.
@@ -126,7 +124,7 @@ Para que las reglas funcionen automaticamente (sin que Claude las lea cada vez),
         "hooks": [
           {
             "type": "command",
-            "command": "if echo \"$TOOL_INPUT\" | grep -qi 'git commit\\|git add'; then echo '[SYNAPIS] Verificar: .env en .gitignore, lint limpio, sin secrets en staged files'; fi"
+            "command": "if echo \"$TOOL_INPUT\" | grep -qi 'git commit\\|git add'; then echo '[SINAPSIS] Verificar: .env en .gitignore, lint limpio, sin secrets en staged files'; fi"
           }
         ]
       }
@@ -137,7 +135,7 @@ Para que las reglas funcionen automaticamente (sin que Claude las lea cada vez),
         "hooks": [
           {
             "type": "command",
-            "command": "if echo \"$TOOL_INPUT\" | grep -qi '\\.docx\\|\\.pdf\\|\\.pptx'; then echo '[SYNAPIS] Recuerda: generar version HTML del entregable'; fi"
+            "command": "if echo \"$TOOL_INPUT\" | grep -qi '\\.docx\\|\\.pdf\\|\\.pptx'; then echo '[SINAPSIS] Recuerda: generar version HTML del entregable'; fi"
           }
         ]
       }
@@ -187,15 +185,6 @@ Escribe: /skill-audit
 ```
 
 Te muestra cuantos tokens gasta cada skill y sugiere fusiones, archivados, y eliminaciones. **Nada se borra sin tu permiso.**
-
-### /clone
-Clona un proyecto exitoso como base para uno nuevo:
-
-```
-Escribe: /clone
-```
-
-Copia las skills, estructura, y configuracion de un proyecto anterior.
 
 ---
 
@@ -256,14 +245,14 @@ tokens_estimate: 500
 cp -r ~/.claude/skills ~/.claude/skills_backup_$(date +%Y%m%d)
 
 # Reinstalar
-cd synapis
+cd sinapsis
 ./install.sh  # o install.bat en Windows
 ```
 
 ### "Quiero desinstalar Sinapsis"
 Elimina estas carpetas:
 - `~/.claude/skills/skill-router/`
-- `~/.claude/skills/synapis-*/`
+- `~/.claude/skills/sinapsis-*/`
 - Los comandos en `~/.claude/commands/` que instalo Sinapsis
 
 Tu CLAUDE.md y proyectos quedan intactos.
