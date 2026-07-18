@@ -42,7 +42,7 @@ if %errorlevel% neq 0 (
 where node >nul 2>&1
 if %errorlevel% neq 0 (
     echo   ERROR: Node.js not found.
-    echo          Sinapsis v4.5 hooks require Node.js.
+    echo          Sinapsis hooks require Node.js.
     echo          Install it: https://nodejs.org
     pause
     exit /b 1
@@ -50,17 +50,27 @@ if %errorlevel% neq 0 (
     for /f "tokens=*" %%v in ('node --version') do echo   OK Node.js %%v detected
 )
 
-where python3 >nul 2>&1
-if %errorlevel% neq 0 (
-    where python >nul 2>&1
-    if %errorlevel% neq 0 (
+:: v4.8.1 (audit finding #3 + review): the old check trusted `where python3`, but on
+:: Windows that resolves to the Microsoft Store shim -- it answers `where` yet does
+:: not execute, so the shim's notice was printed as "OK ... detected" and the real
+:: warning never showed. Mirror install.sh: try `py -3` first (the real launcher),
+:: then `python`, and only accept a command whose --version reports "Python 3.".
+:: Also uses !errorlevel! -- %errorlevel% inside a parenthesised block is stale.
+set "PY_VER="
+for /f "delims=" %%v in ('py -3 --version 2^>^&1') do set "PY_VER=%%v"
+echo(!PY_VER!| findstr /C:"Python 3." >nul 2>&1
+if !errorlevel! equ 0 (
+    echo   OK !PY_VER! detected
+) else (
+    set "PY_VER="
+    for /f "delims=" %%v in ('python --version 2^>^&1') do set "PY_VER=%%v"
+    echo(!PY_VER!| findstr /C:"Python 3." >nul 2>&1
+    if !errorlevel! equ 0 (
+        echo   OK !PY_VER! detected
+    ) else (
         echo   ! Python 3 not found -- observation hooks will be disabled
         echo     Install it: https://python.org (optional but recommended^)
-    ) else (
-        for /f "tokens=*" %%v in ('python --version 2^>^&1') do echo   OK %%v detected
     )
-) else (
-    for /f "tokens=*" %%v in ('python3 --version 2^>^&1') do echo   OK %%v detected
 )
 
 if exist "%CLAUDE_HOME%" (
@@ -73,10 +83,12 @@ if exist "%CLAUDE_HOME%" (
 :: Step 2: Backup if upgrading
 echo [2/8] Checking for existing installation...
 
+:: v4.8.1: wmic is deprecated and removed in Windows 11 24H2+ -- use PowerShell.
+:: Comment kept outside the block: :: inside parentheses breaks cmd.exe parsing.
 if "%UPGRADING%"=="true" (
     echo   ! Existing installation detected -- creating backup
-    for /f "tokens=2 delims==" %%I in ('wmic os get localdatetime /value') do set "dt=%%I"
-    set "BACKUP_DIR=%CLAUDE_HOME%\_backup_!dt:~0,8!_!dt:~8,6!"
+    for /f %%I in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMdd_HHmmss"') do set "dt=%%I"
+    set "BACKUP_DIR=%CLAUDE_HOME%\_backup_!dt!"
     mkdir "!BACKUP_DIR!" 2>nul
     xcopy "%SKILLS_DIR%" "!BACKUP_DIR!\skills_backup\" /E /I /Q >nul 2>&1
     xcopy "%COMMANDS_DIR%" "!BACKUP_DIR!\commands_backup\" /E /I /Q >nul 2>&1
@@ -161,27 +173,29 @@ echo   NOTE: On Windows, hooks run via Git Bash or WSL. See README for details.
 :: Step 6: Configure settings.json
 echo [6/8] Configuring hooks in settings.json...
 
-if not exist "%CLAUDE_HOME%\settings.json" (
-    node -e "var fs=require('fs'),p1=process.argv[1],p2=process.argv[2];var t=JSON.parse(fs.readFileSync(p1,'utf8'));function s(o){if(Array.isArray(o))return o.map(s);if(typeof o==='object'&&o!==null){var r={};for(var k in o){if(k[0]==='_')continue;r[k]=s(o[k]);}return r;}return o;}fs.writeFileSync(p2,JSON.stringify(s(t),null,2));" "%SCRIPT_DIR%core\settings.template.json" "%CLAUDE_HOME%\settings.json" >nul 2>&1
-    if %errorlevel% equ 0 (
-        echo   OK settings.json created with v4.5 hooks (PreCompact included)
-    ) else (
-        echo   ! Could not auto-create settings.json
-        echo     Copy core\settings.template.json to %CLAUDE_HOME%\settings.json manually
-    )
+:: v4.8.1 (audit finding #1): the old behaviour registered nothing when the file
+:: already existed. _merge-hooks.js creates it when missing, otherwise deep-merges
+:: (dedup by command, existing entries preserved, malformed file left untouched).
+node "%SCRIPT_DIR%core\_merge-hooks.js" "%SCRIPT_DIR%core\settings.template.json" "%CLAUDE_HOME%\settings.json" >nul 2>&1
+if !errorlevel! equ 0 (
+    echo   OK Sinapsis hooks wired into settings.json (existing entries preserved^)
 ) else (
-    echo   ! settings.json already exists
+    echo   ! Could not update settings.json -- left untouched
     echo     Review core\settings.template.json and merge hooks manually
 )
 
 :: Step 7: Copy skills
 echo [7/8] Installing skills...
 
+:: v4.8.1 (audit finding #3): without /E the skill SUBDIRS -- hooks/observe.sh and
+:: observe_v3.py -- never reached disk on Windows and the observer recorded nothing.
+:: NOTE: comments must stay OUTSIDE the block below: cmd.exe delimits parenthesised
+:: blocks before recognising :: comments, so a comment inside the block is parsed.
 set "skill_count=0"
 for /D %%d in ("%SCRIPT_DIR%skills\*") do (
     set "skill_name=%%~nxd"
     if not exist "%SKILLS_DIR%\!skill_name!" mkdir "%SKILLS_DIR%\!skill_name!"
-    xcopy "%%d\*" "%SKILLS_DIR%\!skill_name!\" /Y /Q >nul 2>&1
+    xcopy "%%d\*" "%SKILLS_DIR%\!skill_name!\" /E /I /Y /Q >nul 2>&1
     echo   OK !skill_name!
     set /a skill_count+=1
 )
@@ -207,9 +221,9 @@ if "%UPGRADING%"=="true" (
 echo ============================================================
 echo.
 echo   What was installed:
-echo   - 2 global skills (skill-router + sinapsis-learning)
+echo   - 3 global skills (sinapsis-learning + sinapsis-instincts + skill-router)
 echo   - %skill_count% total skills
-echo   - %cmd_count% slash commands (/evolve, /clone, /system-status...)
+echo   - %cmd_count% slash commands (/evolve, /system-status, /eod...)
 echo   - 6 hook scripts + dream cycle (passive-activator, instinct-activator, session-learner, project-context, eod-gather, dream, precompact-guard)
 echo   - Core config: catalog, passive rules, instincts index, operator state
 echo.

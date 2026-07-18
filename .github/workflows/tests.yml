@@ -74,3 +74,7 @@ jobs:
       - name: Run Plexus separation tests
         shell: bash
         run: bash tests/test-plexus-separation.sh
+
+      - name: Run installer hardening tests
+        shell: bash
+        run: bash tests/test-installer-hardening.sh

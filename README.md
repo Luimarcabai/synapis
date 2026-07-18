@@ -1,6 +1,6 @@
-# Sinapsis v4.6.1
+# Sinapsis v4.8
 
-[![Version](https://img.shields.io/badge/version-4.6.1-blue.svg)](https://github.com/Luispitik/sinapsis)
+[![Version](https://img.shields.io/badge/version-4.8.1-blue.svg)](https://github.com/Luispitik/sinapsis)
 [![Tests](https://img.shields.io/badge/tests-112%20passing-green.svg)](tests/)
 [![CI](https://github.com/Luispitik/sinapsis/actions/workflows/tests.yml/badge.svg)](https://github.com/Luispitik/sinapsis/actions)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)

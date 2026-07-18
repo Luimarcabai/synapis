@@ -70,10 +70,13 @@ echo ""
 echo "[Section 3] Version bumped to v4.6.0"
 
 # T7: README header + badge at v4.6.x (Opus 4.8 line; patches keep the 4.6 minor)
-if grep -qE "# Sinapsis v4\.6\.[0-9]" "$ROOT/README.md" 2>/dev/null && grep -qE "version-4\.6\.[0-9]" "$ROOT/README.md" 2>/dev/null; then
-  pass "T7: README declares v4.6.x (header + badge)"
+# v4.8.1: version-agnostic — header and badge must track the CHANGELOG's latest
+# release (pinning v4.6.x here was itself the drift this assert existed to catch)
+LATEST_MM=$(grep -m1 -oE "## v[0-9]+\.[0-9]+" "$ROOT/CHANGELOG.md" | grep -oE "[0-9]+\.[0-9]+")
+if grep -qE "# Sinapsis v${LATEST_MM//./\\.}" "$ROOT/README.md" 2>/dev/null && grep -qE "version-${LATEST_MM//./\\.}" "$ROOT/README.md" 2>/dev/null; then
+  pass "T7: README header + badge track CHANGELOG latest (v$LATEST_MM)"
 else
-  fail "T7: README should declare v4.6.x in header and badge"
+  fail "T7: README header/badge drifted from CHANGELOG latest (v$LATEST_MM)"
 fi
 
 # T8: CHANGELOG has a v4.6.0 entry

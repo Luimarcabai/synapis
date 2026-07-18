@@ -195,26 +195,29 @@ chmod +x "$SKILLS_DIR/_generate-dashboard.py" 2>/dev/null || true
 
 echo -e "${GREEN}  OK${NC} 6 hook scripts + dream cycle + dashboard generator installed"
 
-# ── Step 5b: Legacy file cleanup (v4.3.3) ──
+# ── Step 5b: Legacy file cleanup (v4.3.3; v4.8.1 archives instead of deleting) ──
+# Audit finding #2: one of these hardcoded names can be a LIVE user directory
+# (e.g. a still-active synapis-learning install). Never rm -rf — move aside.
 LEGACY_CLEANED=0
-# v4.4 gstack files (removed in v4.3.2)
+LEGACY_ARCHIVE="$ARCHIVED_DIR/legacy-$(date +%Y%m%d_%H%M%S)"
+# v4.4 gstack files (removed in v4.3.2) + v3.2 leftovers
 for legacy in "$SKILLS_DIR/_timeline-log.sh" "$SKILLS_DIR/_session-timeline.jsonl" \
-  "$SKILLS_DIR/review-army" "$SKILLS_DIR/cso-audit" "$SKILLS_DIR/investigate-pro"; do
-  if [ -e "$legacy" ]; then
-    rm -rf "$legacy"
-    LEGACY_CLEANED=$((LEGACY_CLEANED + 1))
-  fi
-done
-# v3.2 leftovers
-for legacy in "$SKILLS_DIR/sinapsis-optimizer" "$SKILLS_DIR/sinapsis-researcher" \
+  "$SKILLS_DIR/review-army" "$SKILLS_DIR/cso-audit" "$SKILLS_DIR/investigate-pro" \
+  "$SKILLS_DIR/sinapsis-optimizer" "$SKILLS_DIR/sinapsis-researcher" \
   "$SKILLS_DIR/synapis-learning" "$COMMANDS_DIR/clone.md" "$COMMANDS_DIR/retro-semanal.md"; do
   if [ -e "$legacy" ]; then
-    rm -rf "$legacy"
-    LEGACY_CLEANED=$((LEGACY_CLEANED + 1))
+    mkdir -p "$LEGACY_ARCHIVE"
+    # Count only real moves — mv can fail (e.g. open handles on Windows/Git Bash)
+    # and reporting an archive that did not happen is worse than none.
+    if mv "$legacy" "$LEGACY_ARCHIVE/" 2>/dev/null; then
+      LEGACY_CLEANED=$((LEGACY_CLEANED + 1))
+    else
+      echo -e "${YELLOW}  !  Could not archive $legacy (in use?) — left in place${NC}"
+    fi
   fi
 done
 if [ "$LEGACY_CLEANED" -gt 0 ]; then
-  echo -e "${YELLOW}  !  Cleaned $LEGACY_CLEANED legacy files from previous versions${NC}"
+  echo -e "${YELLOW}  !  Archived $LEGACY_CLEANED legacy files to $LEGACY_ARCHIVE${NC}"
 fi
 
 # ── Step 6: Configure settings.json ──
@@ -222,31 +225,16 @@ echo -e "${BLUE}[6/8]${NC} Configuring hooks in settings.json..."
 
 SETTINGS_FILE="$CLAUDE_HOME/settings.json"
 
-if [ ! -f "$SETTINGS_FILE" ]; then
-    # Create from template (strip _comment fields)
-    node -e '
-const fs = require("fs");
-const template = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-// Remove _comment fields recursively
-function strip(obj) {
-  if (Array.isArray(obj)) return obj.map(strip);
-  if (typeof obj === "object" && obj !== null) {
-    const out = {};
-    for (const [k, v] of Object.entries(obj)) {
-      if (k.startsWith("_")) continue;
-      out[k] = strip(v);
-    }
-    return out;
-  }
-  return obj;
-}
-fs.writeFileSync(process.argv[2], JSON.stringify(strip(template), null, 2));
-' "$SCRIPT_DIR/core/settings.template.json" "$SETTINGS_FILE"
-    echo -e "${GREEN}  OK${NC} settings.json created with v4.4 hooks"
+# v4.8.1 (audit finding #1): the old behaviour registered NOTHING when the file
+# already existed ("merge hooks manually") — a ghost install with the pipeline
+# inert. _merge-hooks.js creates the file when missing and otherwise deep-merges:
+# only Sinapsis hooks whose command is not yet registered are appended, every
+# existing entry is preserved, and a malformed settings.json is left untouched.
+if node "$SCRIPT_DIR/core/_merge-hooks.js" "$SCRIPT_DIR/core/settings.template.json" "$SETTINGS_FILE"; then
+    echo -e "${GREEN}  OK${NC} Sinapsis hooks wired into settings.json (existing entries preserved)"
 else
-    echo -e "${YELLOW}  ! settings.json already exists${NC}"
+    echo -e "${YELLOW}  ! Could not update settings.json — left untouched${NC}"
     echo -e "${YELLOW}    Review core/settings.template.json and merge hooks manually${NC}"
-    echo -e "${YELLOW}    (Existing hooks preserved to avoid breaking your setup)${NC}"
 fi
 
 # ── Step 7: Copy skills ──
@@ -290,7 +278,7 @@ echo ""
 echo -e "  ${BOLD}What was installed:${NC}"
 echo -e "  - 3 global skills (always active: sinapsis-learning + sinapsis-instincts + skill-router)"
 echo -e "  - $skill_count total skills"
-echo -e "  - $cmd_count slash commands (/evolve, /clone, /system-status...)"
+echo -e "  - $cmd_count slash commands (/evolve, /system-status, /eod...)"
 echo -e "  - 6 hook scripts + dream cycle (passive-activator, instinct-activator, session-learner, project-context, eod-gather, precompact-guard, dream)"
 echo -e "  - Core config: catalog, passive rules, instincts index, operator state"
 echo ""
