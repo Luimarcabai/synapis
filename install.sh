@@ -207,8 +207,13 @@ for legacy in "$SKILLS_DIR/_timeline-log.sh" "$SKILLS_DIR/_session-timeline.json
   "$SKILLS_DIR/synapis-learning" "$COMMANDS_DIR/clone.md" "$COMMANDS_DIR/retro-semanal.md"; do
   if [ -e "$legacy" ]; then
     mkdir -p "$LEGACY_ARCHIVE"
-    mv "$legacy" "$LEGACY_ARCHIVE/" 2>/dev/null || true
-    LEGACY_CLEANED=$((LEGACY_CLEANED + 1))
+    # Count only real moves — mv can fail (e.g. open handles on Windows/Git Bash)
+    # and reporting an archive that did not happen is worse than none.
+    if mv "$legacy" "$LEGACY_ARCHIVE/" 2>/dev/null; then
+      LEGACY_CLEANED=$((LEGACY_CLEANED + 1))
+    else
+      echo -e "${YELLOW}  !  Could not archive $legacy (in use?) — left in place${NC}"
+    fi
   fi
 done
 if [ "$LEGACY_CLEANED" -gt 0 ]; then

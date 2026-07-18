@@ -228,9 +228,9 @@ fi
 
 # T14: errorlevel reads inside parenthesised blocks use delayed expansion
 if grep -q "enabledelayedexpansion" "$BAT" \
-   && awk '/where python >nul/{found=1} found && /!errorlevel!/{ok=1} END{exit ok?0:1}' "$BAT" \
+   && awk '/py -3 --version/{found=1} found && /!errorlevel!/{ok=1} END{exit ok?0:1}' "$BAT" \
    && awk '/_merge-hooks.js/{found=1} found && /!errorlevel!/{ok=1} END{exit ok?0:1}' "$BAT"; then
-  pass "T14: python fallback and settings result use !errorlevel!"
+  pass "T14: python detection and settings result use !errorlevel!"
 else
   fail "T14: stale %errorlevel% inside parenthesised blocks"
 fi
@@ -272,6 +272,68 @@ if [ "$tpl_ok" = "7" ]; then
 else
   fail "T17: settings.template.json declares $tpl_ok hook commands (expected 7)"
 fi
+
+# T18: no :: comments inside parenthesised blocks (adversarial review, 2026-07-18):
+# cmd.exe delimits ( ) blocks BEFORE recognising ::, so an indented :: comment is
+# parsed — and any ')' in its text closes the block and aborts the whole batch at
+# parse time with exit 255. All in-file :: comments must sit at column 0, top level.
+if grep -qE '^[[:space:]]+::' "$BAT"; then
+  fail "T18: indented :: comment inside a block in install.bat (parse-time abort risk)"
+else
+  pass "T18: no :: comments inside parenthesised blocks in install.bat"
+fi
+
+# T19: "hooks": [] (empty array — valid JSON, truthy) must be normalised and wired,
+# not silently dropped by JSON.stringify while reporting success
+printf '{ "hooks": [] }\n' > "$W/s19.json"
+node "$MERGE" "$TEMPLATE" "$W/s19.json" >/dev/null 2>&1 || true
+r=$(count_sinapsis_hooks "$W/s19.json" 2>/dev/null || echo "0 0")
+if [ "${r%% *}" = "7" ] && node -e 's=require(process.argv[1]);process.exit(!Array.isArray(s.hooks)&&typeof s.hooks==="object"?0:1)' "$W/s19.json"; then
+  pass "T19: empty hooks array normalised to object, 7 hooks wired"
+else
+  fail "T19: empty hooks array ghost-merge (got: $r)"
+fi
+
+# T20: "hooks": [non-empty array] cannot be interpreted — exit non-zero, untouched
+printf '{ "hooks": [ { "weird": true } ] }\n' > "$W/s20.json"
+before=$(cat "$W/s20.json")
+if node "$MERGE" "$TEMPLATE" "$W/s20.json" >/dev/null 2>&1; then
+  fail "T20: non-empty hooks array must exit non-zero"
+else
+  if [ "$(cat "$W/s20.json")" = "$before" ]; then
+    pass "T20: non-empty hooks array refused, file untouched"
+  else
+    fail "T20: non-empty hooks array was modified"
+  fi
+fi
+
+# ── Stage 4: install.bat REAL execution smoke test (Windows hosts only) ──
+# Static greps cannot catch cmd.exe parse-time aborts (the exact bug the review
+# found). On Windows runners, execute the actual installer in a sandboxed
+# USERPROFILE and assert the outcome end-to-end.
+echo ""
+echo "[Stage 4] install.bat execution smoke test"
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*)
+    SMOKE_HOME="$SANDBOX/bat_home"; mkdir -p "$SMOKE_HOME"
+    WIN_HOME=$(cygpath -w "$SMOKE_HOME")
+    WIN_BAT=$(cygpath -w "$SCRIPT_DIR/install.bat")
+    code=0
+    USERPROFILE="$WIN_HOME" cmd //c "$WIN_BAT" </dev/null >"$SANDBOX/bat_out.log" 2>&1 || code=$?
+    obs="$SMOKE_HOME/.claude/skills/sinapsis-learning/hooks/observe.sh"
+    r=$(count_sinapsis_hooks "$SMOKE_HOME/.claude/settings.json" 2>/dev/null || echo "0 0")
+    cmds=$(ls "$SMOKE_HOME/.claude/commands/"*.md 2>/dev/null | wc -l)
+    if [ "$code" = "0" ] && [ -f "$obs" ] && [ "${r%% *}" = "7" ] && [ "$cmds" -gt 0 ]; then
+      pass "T21: install.bat executes end-to-end (exit 0, observe.sh on disk, 7 hooks, $cmds commands)"
+    else
+      fail "T21: install.bat execution (exit=$code, observe.sh=$([ -f "$obs" ] && echo si || echo no), hooks=${r%% *}, cmds=$cmds)"
+      tail -15 "$SANDBOX/bat_out.log" 2>/dev/null | sed 's/^/       | /'
+    fi
+    ;;
+  *)
+    pass "T21: install.bat execution smoke test (skipped: non-Windows host)"
+    ;;
+esac
 
 echo ""
 echo "=== Results: $PASS/$TESTS passed, $FAIL failed ==="

@@ -50,20 +50,27 @@ if %errorlevel% neq 0 (
     for /f "tokens=*" %%v in ('node --version') do echo   OK Node.js %%v detected
 )
 
-:: v4.8.1 (audit finding #3): %errorlevel% inside a parenthesised block expands at
-:: parse time — the inner check reused the OUTER result, so a machine with
-:: `python` but not `python3` always reported "Python 3 not found". Use !errorlevel!.
-where python3 >nul 2>&1
-if !errorlevel! neq 0 (
-    where python >nul 2>&1
-    if !errorlevel! neq 0 (
+:: v4.8.1 (audit finding #3 + review): the old check trusted `where python3`, but on
+:: Windows that resolves to the Microsoft Store shim -- it answers `where` yet does
+:: not execute, so the shim's notice was printed as "OK ... detected" and the real
+:: warning never showed. Mirror install.sh: try `py -3` first (the real launcher),
+:: then `python`, and only accept a command whose --version reports "Python 3.".
+:: Also uses !errorlevel! -- %errorlevel% inside a parenthesised block is stale.
+set "PY_VER="
+for /f "delims=" %%v in ('py -3 --version 2^>^&1') do set "PY_VER=%%v"
+echo(!PY_VER!| findstr /C:"Python 3." >nul 2>&1
+if !errorlevel! equ 0 (
+    echo   OK !PY_VER! detected
+) else (
+    set "PY_VER="
+    for /f "delims=" %%v in ('python --version 2^>^&1') do set "PY_VER=%%v"
+    echo(!PY_VER!| findstr /C:"Python 3." >nul 2>&1
+    if !errorlevel! equ 0 (
+        echo   OK !PY_VER! detected
+    ) else (
         echo   ! Python 3 not found -- observation hooks will be disabled
         echo     Install it: https://python.org (optional but recommended^)
-    ) else (
-        for /f "tokens=*" %%v in ('python --version 2^>^&1') do echo   OK %%v detected
     )
-) else (
-    for /f "tokens=*" %%v in ('python3 --version 2^>^&1') do echo   OK %%v detected
 )
 
 if exist "%CLAUDE_HOME%" (
@@ -76,9 +83,10 @@ if exist "%CLAUDE_HOME%" (
 :: Step 2: Backup if upgrading
 echo [2/8] Checking for existing installation...
 
+:: v4.8.1: wmic is deprecated and removed in Windows 11 24H2+ -- use PowerShell.
+:: Comment kept outside the block: :: inside parentheses breaks cmd.exe parsing.
 if "%UPGRADING%"=="true" (
     echo   ! Existing installation detected -- creating backup
-    :: v4.8.1: wmic is deprecated and removed in Windows 11 24H2+ — use PowerShell
     for /f %%I in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMdd_HHmmss"') do set "dt=%%I"
     set "BACKUP_DIR=%CLAUDE_HOME%\_backup_!dt!"
     mkdir "!BACKUP_DIR!" 2>nul
@@ -179,12 +187,14 @@ if !errorlevel! equ 0 (
 :: Step 7: Copy skills
 echo [7/8] Installing skills...
 
+:: v4.8.1 (audit finding #3): without /E the skill SUBDIRS -- hooks/observe.sh and
+:: observe_v3.py -- never reached disk on Windows and the observer recorded nothing.
+:: NOTE: comments must stay OUTSIDE the block below: cmd.exe delimits parenthesised
+:: blocks before recognising :: comments, so a comment inside the block is parsed.
 set "skill_count=0"
 for /D %%d in ("%SCRIPT_DIR%skills\*") do (
     set "skill_name=%%~nxd"
     if not exist "%SKILLS_DIR%\!skill_name!" mkdir "%SKILLS_DIR%\!skill_name!"
-    :: v4.8.1 (audit finding #3): without /E the skill SUBDIRS (hooks/observe.sh,
-    :: observe_v3.py) never reached disk on Windows and the observer recorded nothing.
     xcopy "%%d\*" "%SKILLS_DIR%\!skill_name!\" /E /I /Y /Q >nul 2>&1
     echo   OK !skill_name!
     set /a skill_count+=1

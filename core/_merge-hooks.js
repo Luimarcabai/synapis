@@ -74,8 +74,25 @@ if (typeof settings !== "object" || settings === null || Array.isArray(settings)
   process.exit(1);
 }
 
+// Review fix (2026-07-18): "hooks": [] is valid JSON and truthy — named properties
+// set on an array are silently dropped by JSON.stringify, so the old code reported
+// "merged" while writing zero hooks. Normalise an EMPTY array; refuse anything else
+// that is not a plain object (left untouched, same contract as malformed JSON).
+if (settings.hooks === undefined || settings.hooks === null) {
+  settings.hooks = {};
+} else if (Array.isArray(settings.hooks)) {
+  if (settings.hooks.length === 0) {
+    settings.hooks = {};
+  } else {
+    console.error("settings.json 'hooks' is a non-empty array (expected an object) — left untouched");
+    process.exit(1);
+  }
+} else if (typeof settings.hooks !== "object") {
+  console.error("settings.json 'hooks' is not an object — left untouched");
+  process.exit(1);
+}
+
 let added = 0;
-settings.hooks = settings.hooks || {};
 
 for (const [event, templateGroups] of Object.entries(template.hooks || {})) {
   if (settings.hooks[event] !== undefined && !Array.isArray(settings.hooks[event])) {
